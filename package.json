@@ -1,0 +1,41 @@
+{
+  "name": "@bluepjs/vue3-ide",
+  "version": "0.1.0",
+  "description": "IDE for @bluepjs blueprints",
+  "main": "./dist/editor.common.js",
+  "module": "./dist/editor.umd.min.js",
+  "files": [
+    "dist/*"
+  ],
+  "scripts": {
+    "serve": "vue-cli-service serve",
+    "build": "vue-cli-service build --target lib --name editor ./src/plugin.js",
+    "lint": "vue-cli-service lint"
+  },
+  "keywords": ["bluepjs","ide","blueprint","editor"],
+  "author": "Evgeny Trifonov <abrakadobr@gmail.com>",
+  "homepage": "https://github.com/bluep-js/vue3-ide#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bluep-js/vue3-ide"
+  },
+  "bugs": {
+    "url": "https://github.com/bluep-js/vue3-ide/issues"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "core-js": "^3.6.5",
+    "vue": "^3.0.0"
+  },
+  "devDependencies": {
+    "@vue/cli-plugin-babel": "~4.5.0",
+    "@vue/cli-plugin-eslint": "~4.5.0",
+    "@vue/cli-service": "~4.5.0",
+    "@vue/compiler-sfc": "^3.0.0",
+    "babel-eslint": "^10.1.0",
+    "eslint": "^6.7.2",
+    "eslint-plugin-vue": "^7.0.0",
+    "sass": "^1.26.5",
+    "sass-loader": "^8.0.2"
+  }
+}

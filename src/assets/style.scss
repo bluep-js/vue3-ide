@@ -1,0 +1,191 @@
+@use "sass:math";
+
+$bgColor: #313638;
+$borderColor: #aaa;
+$textColor: #ddd;
+
+$nodeTypeExecute: #619298;
+$nodeTypeModifier: #69bd70;
+
+$panelWidth: 320px;
+$panelPadding: 4px;
+
+$paperGridColor: lighten($bgColor, 25%);
+$nodeColorExecute: #619298;
+$nodeColorModifier: #69bd70;
+
+$graphTextSize: 13px;
+$panelTextSize: 22px;
+
+.bluep-panel-wrapper {
+  font-size: $panelTextSize;
+  padding: $panelPadding;
+
+  .bluep-panel {
+    padding: $panelPadding;
+    border: $borderColor 1px dotted;
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      border-bottom: 1px dashed $borderColor;
+      margin-bottom: $panelPadding;
+      padding: $panelPadding;
+    }
+
+    .panel-body {
+      .list-item {
+        display: flex;
+        justify-content: space-between;
+        margin-top: $panelPadding;
+
+        .list-item-text {
+          flex-grow: 5;
+          button {
+            text-align: left;
+            width: 100%;
+          }
+        }
+      }
+    }
+  }
+}
+
+button.icon-button, button.clear-button, button.outline-button {
+  border: 0;
+  background: none;
+  color: $textColor;
+  margin: 0;
+  padding: 0 $panelPadding;
+  font-size: $panelTextSize;
+  height: $panelTextSize;
+  line-height: $panelTextSize;
+
+  &.icon-button {
+    width: $panelTextSize * 2 + $panelPadding * 2;
+  }
+
+  &.outline-button {
+    height: auto !important;
+    padding: $panelPadding;
+    border: 1px solid $textColor !important;
+    border-radius: math.div($panelTextSize, 5);
+    // border-radius: $panelTextSize/5;
+  }
+
+  svg {
+    fill: $textColor;
+  }
+
+  &:disabled {
+    color: darken($textColor, 25%);
+    svg {
+      fill: darken($textColor,25%);
+    }
+  }
+
+  /* Custom size */
+  &.button-small {
+    font-size: $panelTextSize * 0.8 !important;
+    height: $panelTextSize !important;
+    line-height: $panelTextSize !important;
+  }
+}
+
+input.panel-input {
+  margin: 0;
+  color: $textColor;
+  font-size: $panelTextSize * 0.8;
+  height: $panelTextSize !important;
+  line-height: $panelTextSize !important;
+  // margin-left: 1rem;
+  padding-left: $panelPadding;
+  width: auto;
+  position: relative;
+  top: 0;
+
+  &[type='checkbox'] {
+    // width: $panelTextSize/1.4;
+    // height: $panelTextSize/1.4;
+    width: math.div($panelTextSize, 1.4);
+    height: math.div($panelTextSize, 1.4);
+  }
+}
+
+select.panel-input {
+  // width: 100%;
+  margin: 0;
+  // height: fit-content;
+  font-size: $panelTextSize * 0.8;
+  height: $panelTextSize !important;
+  line-height: $panelTextSize !important;
+  padding-left: $panelPadding;
+  color: $textColor;
+
+
+
+  option {
+    color: #333;
+
+    &:disabled {
+      color: #aaa;
+    }
+  }
+}
+
+.w-50 {
+  width: 50%;
+}
+
+.w-100 {
+  width: 100%;
+}
+
+.d-flex {
+  display: flex !important;
+}
+
+.flex-row {
+  display: flex;
+  justify-content: space-between;
+}
+// px
+.ml-5 {
+  margin-left: 5px;
+}
+.mb-2 {
+  margin-bottom: 2px;
+}
+.mb-10 {
+  margin-bottom: 10px;
+}
+// rem
+.mt-1r {
+  margin-top: 1rem;
+}
+.mb-1r {
+  margin-bottom: 1rem;
+}
+.mr-1r {
+  margin-right: 1rem;
+}
+.ml-1r {
+  margin-left: 1rem;
+}
+
+.bg-white {
+  background: #fff !important;
+}
+
+.text-dark {
+  color: #333 !important;
+}
+
+.text-left {
+  text-align: left;
+}
+
+.danger {
+  border-color: red !important;
+  color: red !important;
+}
