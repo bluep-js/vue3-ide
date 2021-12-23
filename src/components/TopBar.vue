@@ -81,7 +81,7 @@ export default {
         :value="lib.code"
         :selected="currentLibrary === lib.code"
       >{{lib.name}}</option>
-      <option value="add">Create New</option>
+      <option value="add" disabled>Create New</option>
     </select>
     <button :disabled="!currentLibrary" @click="$emit('viewLibrary')" class="icon-button">
       <i :class="icons.view + ' ' + icons.fw"></i>

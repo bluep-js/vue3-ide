@@ -40,7 +40,17 @@ export default {
     },
     libraries: {
       type: Object,
-      default: () => (null)
+      default: () => ({
+        default: {
+          code: 'default',
+          name: 'Default',
+          functions: {},
+          classes: {},
+          enums: {},
+          structs: {},
+          events: {}
+        }
+      })
     },
     actors: {
       type: Object,
@@ -68,7 +78,8 @@ export default {
           close: 'fas fa-times',
           fw: 'fa-fw'
         },
-        select: null
+        select: null,
+        defaultOnly: false
       })
     }
   },
@@ -83,14 +94,39 @@ export default {
       isSaved: true,
       currentLibrary: null,
       selectedElement: null,
-      selectedVariable: null
+      selectedVariable: null,
+      firstLibs: true
     }
+  },
+  created () {
+    const opts = this.options
+    let lib = null
+    let el = null
+    if (opts && opts.select) {
+      const s = opts.select
+      const libcode = s.type === 'library' ? s.code : s.library
+      if (this.libs[libcode]) {
+        lib = libcode
+        const path = `${s.type}s`
+        if (this.libs[lib][path] && this.libs[lib][path][s.code]) {
+          el = this.libs[lib][path][s.code]
+        }
+      }
+    }
+    if (lib) {
+      this.currentLibrary = lib
+    }
+    if (el) {
+      this.selectedElement = el
+    }
+
   },
   watch: {
     libraries: {
-      handler (next, prev) {
+      handler (next) {
         this.libs = next
-        if (!Object.keys(prev || {}).length) {
+        if (this.firstLibs) {
+          this.firstLibs = false
           this.isSaved = true
           waitFor(0).then(() => {
             const opts = this.options
@@ -192,7 +228,7 @@ export default {
       const enumFunctions = this.nodes.filter(node => node.code.startsWith('enum/'))
       enumFunctions.forEach(enumFunction => {
         // console.log('enum2string', enum2stringFunction)
-        Object.keys(this.libs[this.currentLibrary].enums).forEach(eid => {
+        Object.keys(this.libs[this.currentLibrary].enums || {}).forEach(eid => {
           const enm = this.libs[this.currentLibrary].enums[eid]
           const node = jclone(enumFunction)
           node.addable = true
@@ -220,7 +256,7 @@ export default {
       const structToObjectFunction = this.nodes.find(node => node.code === 'struct/toobject')
       const structFromObjectFunction = this.nodes.find(node => node.code === 'struct/fromobject')
       // library structs
-      Object.keys(this.libs[this.currentLibrary].structs).forEach(sid => {
+      Object.keys(this.libs[this.currentLibrary].structs || {}).forEach(sid => {
         const sct = this.libs[this.currentLibrary].structs[sid]
 
         const nodePack = jclone(structPackFunction)
@@ -263,7 +299,7 @@ export default {
       })
 
       let base = [...ret]
-      Object.values(this.modules).forEach(m => {
+      Object.values(this.modules || {}).forEach(m => {
         if (!m.ide || !m.ide.nodes) {
           return
         }
@@ -507,6 +543,9 @@ export default {
           })
         }
         /**/
+        if (!this.libs[this.currentLibrary].functions) {
+          this.libs[this.currentLibrary].functions = {}
+        }
         this.libs[this.currentLibrary].functions[code] = data
         this.isSaved = false
         this.selectedElement = this.libs[this.currentLibrary].functions[code]
