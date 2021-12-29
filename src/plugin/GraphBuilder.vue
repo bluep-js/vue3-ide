@@ -151,10 +151,11 @@ export default {
       const slotTo = info.slot.direction === 'inputs' ? info.slot : this.dragSlot.slot
       const pointFrom = info.slot.direction === 'inputs' ? this.dragSlot.from : dropPoint
       const pointTo = info.slot.direction === 'inputs' ? dropPoint : this.dragSlot.from
+      const edgeType = slotFrom.type === 'basic/template' ? slotTo.type : slotFrom.type
       const now = new Date()
       const edge = {
         id: `edge_${now.getTime()}`,
-        type: info.type,
+        type: edgeType,
         from: {
           node: nodeFrom.id,
           slot: slotFrom.code
@@ -185,6 +186,14 @@ export default {
       if (!this.graph.nodes[nodeTo.id].inputs[slotTo.code].connections) this.graph.nodes[nodeTo.id].inputs[slotTo.code].connections = {}
       this.graph.nodes[nodeTo.id].inputs[slotTo.code].connections[edge.id] = edge
 
+      if (slotFrom.type === 'basic/template') {
+        this.graph.nodes[nodeFrom.id].templates[slotFrom.template].type = edgeType
+      }
+
+      if (slotTo.type === 'basic/template') {
+        this.graph.nodes[nodeTo.id].templates[slotTo.template].type = edgeType
+      }
+
       this.emitUpdate()
     },
     slotClear ({ node, slot }) {
@@ -209,8 +218,22 @@ export default {
       if (!edge) return
       if (this.graph.nodes[edge.from.node].outputs[edge.from.slot].connections) delete this.graph.nodes[edge.from.node].outputs[edge.from.slot].connections[eid]
       if (this.graph.nodes[edge.to.node].inputs[edge.to.slot].connections) delete this.graph.nodes[edge.to.node].inputs[edge.to.slot].connections[eid]
-      delete this.graph.edges[eid]
+      if (this.graph.nodes[edge.from.node].outputs[edge.from.slot].type === 'basic/template') {
+        const ins = Object.values(this.graph.nodes[edge.from.node].inputs).some(slot => slot.template === this.graph.nodes[edge.from.node].outputs[edge.from.slot].template && Object.keys(slot.connections || {}).length)
+        const outs = Object.values(this.graph.nodes[edge.from.node].outputs).some(slot => slot.template === this.graph.nodes[edge.from.node].outputs[edge.from.slot].template && Object.keys(slot.connections || {}).length)
+        if (!ins && !outs) {
+          delete this.graph.nodes[edge.from.node].templates[this.graph.nodes[edge.from.node].outputs[edge.from.slot].template].type
+        }
+      }
+      if (this.graph.nodes[edge.to.node].inputs[edge.to.slot].type === 'basic/template') {
+        const ins = Object.values(this.graph.nodes[edge.to.node].inputs).some(slot => slot.template === this.graph.nodes[edge.to.node].inputs[edge.to.slot].template && Object.keys(slot.connections || {}).length)
+        const outs = Object.values(this.graph.nodes[edge.to.node].outputs).some(slot => slot.template === this.graph.nodes[edge.to.node].inputs[edge.to.slot].template && Object.keys(slot.connections || {}).length)
+        if (!ins && !outs) {
+          delete this.graph.nodes[edge.to.node].templates[this.graph.nodes[edge.to.node].inputs[edge.to.slot].template].type
+        }
+      }
       delete this.layout.parts[eid]
+      delete this.graph.edges[eid]
       this.emitUpdate()
     },
 
@@ -474,7 +497,7 @@ export default {
 </template>
 
 <style lang="scss" scoped>
-@import '@/assets/style.scss';
+@import './style.scss';
 
 .wrapper {
   height: 100%;

@@ -21,6 +21,10 @@ export default {
     icons: {
       type: Object,
       default: () => null
+    },
+    canRun: {
+      type: Boolean,
+      default: true
     }
   },
   emits: [
@@ -112,7 +116,7 @@ export default {
   <div class="controls">
     <button class="icon-button" :disabled="isSaved" @click="$emit('saveClick')"><i :class="icons.save + ' ' + icons.fw"></i> Save</button>
     <button
-      v-if="selectedElement?.type === 'function' && !selectedElement?.event"
+      v-if="canRun && selectedElement?.type === 'function' && !selectedElement?.event"
       class="icon-button"
       :disabled="!isSaved"
       @click="$emit('runClick')"
@@ -122,7 +126,7 @@ export default {
 </template>
 
 <style lang="scss" scoped>
-@import '@/assets/style.scss';
+@import './style.scss';
 
 .topbar-wrapper {
   display: flex;

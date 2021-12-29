@@ -11,7 +11,7 @@ import GraphVariablePanel from './GraphVariablePanel.vue'
 import EnumBuilder from './EnumBuilder.vue'
 import StructBuilder from './StructBuilder.vue'
 
-import { jclone, waitFor } from '@/utils.js'
+import { jclone, waitFor } from './utils.js'
 
 export default {
   name: 'BluepEditor',
@@ -79,7 +79,8 @@ export default {
           fw: 'fa-fw'
         },
         select: null,
-        defaultOnly: false
+        defaultOnly: false,
+        run: true
       })
     }
   },
@@ -119,7 +120,6 @@ export default {
     if (el) {
       this.selectedElement = el
     }
-
   },
   watch: {
     libraries: {
@@ -166,44 +166,46 @@ export default {
     */
     nodesFull () {
       const ret = [...this.nodes]
-      const variableGet = this.nodes.find(node => node.code === 'variable/get')
-      const variableSet = this.nodes.find(node => node.code === 'variable/set')
-      // get nodes
-      let paths = ['inputs', 'variables']
-      paths.forEach(path => {
-        Object.values(this.libs[this.selectedElement.library].functions[this.selectedElement.code].context[path]).forEach(slot => {
-          const node = jclone(variableGet)
-          node.addable = true
-          node.name = `Get ${slot.name}`
-          node.code += '/' + slot.code
-          node.data = {
-            context: path,
-            code: slot.code,
-            name: slot.name,
-            type: slot.type
-          }
-          node.outputs[slot.code] = jclone(slot)
-          ret.push(node)
+      if (this.libs[this.selectedElement.library].functions[this.selectedElement.code]) {
+        const variableGet = this.nodes.find(node => node.code === 'variable/get')
+        const variableSet = this.nodes.find(node => node.code === 'variable/set')
+        // get nodes
+        let paths = ['inputs', 'variables']
+        paths.forEach(path => {
+          Object.values(this.libs[this.selectedElement.library].functions[this.selectedElement.code].context[path]).forEach(slot => {
+            const node = jclone(variableGet)
+            node.addable = true
+            node.name = `Get ${slot.name}`
+            node.code += '/' + slot.code
+            node.data = {
+              context: path,
+              code: slot.code,
+              name: slot.name,
+              type: slot.type
+            }
+            node.outputs[slot.code] = jclone(slot)
+            ret.push(node)
+          })
         })
-      })
-      // set nodes
-      paths = ['outputs', 'variables']
-      paths.forEach(path => {
-        Object.values(this.libs[this.selectedElement.library].functions[this.selectedElement.code].context[path]).forEach(slot => {
-          const node = jclone(variableSet)
-          node.addable = true
-          node.name = `Set ${slot.name}`
-          node.code += '/' + slot.code
-          node.data = {
-            context: path,
-            code: slot.code,
-            name: slot.name,
-            type: slot.type
-          }
-          node.inputs[slot.code] = jclone(slot)
-          ret.push(node)
+        // set nodes
+        paths = ['outputs', 'variables']
+        paths.forEach(path => {
+          Object.values(this.libs[this.selectedElement.library].functions[this.selectedElement.code].context[path]).forEach(slot => {
+            const node = jclone(variableSet)
+            node.addable = true
+            node.name = `Set ${slot.name}`
+            node.code += '/' + slot.code
+            node.data = {
+              context: path,
+              code: slot.code,
+              name: slot.name,
+              type: slot.type
+            }
+            node.inputs[slot.code] = jclone(slot)
+            ret.push(node)
+          })
         })
-      })
+      }
       // functions nodes
       const graphFunction = this.nodes.find(node => node.code === 'graph/function')
       Object.keys(this.libs[this.currentLibrary].functions).forEach(fid => {
@@ -248,6 +250,31 @@ export default {
             }
           })
           ret.push(node)
+        })
+
+        // modules enums
+        Object.values(this.modules || {}).forEach(m => {
+          Object.keys(m.enums || {}).forEach(eid => {
+            const enm = m.enums[eid]
+            const node = jclone(enumFunction)
+            node.addable = true
+            node.code += `/${eid}`
+            node.data = jclone(enm)
+            node.name = `"${enm.name}" ${node.name}`
+            Object.keys(node.inputs).forEach(slot => {
+              // node.inputs[slot] = jclone(fn.context.inputs[slot])
+              if (node.inputs[slot].type.startsWith('bluep/enum')) {
+                node.inputs[slot].type += `/${eid}`
+              }
+            })
+            Object.keys(node.outputs).forEach(slot => {
+              // node.outputs[slot] = jclone(fn.context.outputs[slot])
+              if (node.outputs[slot].type.startsWith('bluep/enum')) {
+                node.outputs[slot].type += `/${eid}`
+              }
+            })
+            ret.push(node)
+          })
         })
       })
       // struct functions
@@ -298,19 +325,68 @@ export default {
         ret.push(nodeFromObject)
       })
 
+      // modules structs
+      Object.values(this.modules || {}).forEach(m => {
+        Object.keys(m.structs || {}).forEach(sid => {
+          const sct = m.structs[sid]
+
+          const nodePack = jclone(structPackFunction)
+          nodePack.addable = true
+          nodePack.code += `/${sid}`
+          nodePack.data = jclone(sct)
+          nodePack.name = sct.name
+          Object.keys(sct.schema).forEach(field => {
+            nodePack.inputs[field] = jclone(sct.schema[field])
+          })
+          nodePack.outputs.struct.type += `/${sct.code}`
+          ret.push(nodePack)
+
+          const nodeUnpack = jclone(structUnpackFunction)
+          nodeUnpack.addable = true
+          nodeUnpack.code += `/${sid}`
+          nodeUnpack.data = jclone(sct)
+          nodeUnpack.name = sct.name
+          Object.keys(sct.schema).forEach(field => {
+            nodeUnpack.outputs[field] = jclone(sct.schema[field])
+          })
+          nodeUnpack.inputs.struct.type += `/${sct.code}`
+          ret.push(nodeUnpack)
+
+          const nodeToObject = jclone(structToObjectFunction)
+          nodeToObject.addable = true
+          nodeToObject.code += `/${sid}`
+          nodeToObject.data = jclone(sct)
+          nodeToObject.name = sct.name
+          nodeToObject.inputs.struct.type += `/${sct.code}`
+          ret.push(nodeToObject)
+
+          const nodeFromObject = jclone(structFromObjectFunction)
+          nodeFromObject.addable = true
+          nodeFromObject.code += `/${sid}`
+          nodeFromObject.data = jclone(sct)
+          nodeFromObject.name = sct.name
+          nodeFromObject.outputs.struct.type += `/${sct.code}`
+          ret.push(nodeFromObject)
+        })
+      })
+
       let base = [...ret]
       Object.values(this.modules || {}).forEach(m => {
         if (!m.ide || !m.ide.nodes) {
           return
         }
         let nodesFn = null
-        try {
-          // eslint-disable-next-line
-          nodesFn = eval(m.ide.nodes)
-        } catch (err) {
-          // eslint-disable-next-line
-          console.error('eval failed', err)
-          nodesFn = null
+        if (typeof m.ide.nodes === 'function') {
+          nodesFn = m.ide.nodes
+        } else {
+          try {
+            // eslint-disable-next-line
+            nodesFn = eval(m.ide.nodes)
+          } catch (err) {
+            // eslint-disable-next-line
+            console.error('eval failed', err)
+            nodesFn = null
+          }
         }
         if (typeof nodesFn !== 'function') {
           return
@@ -357,27 +433,29 @@ export default {
           ret[tp.code] = tp
         })
 
+      // modules types
       let base = { ...ret }
       Object.values(this.modules).forEach(m => {
-        if (!m.ide || !m.ide.types) {
-          return
-        }
-        let fn = null
-        try {
-          // eslint-disable-next-line
-          fn = eval(m.ide.types)
-        } catch (err) {
-          // eslint-disable-next-line
-          console.error('eval failed', err)
-          fn = null
-        }
-        if (typeof fn !== 'function') {
-          return
-        }
-        const ml = fn(this.libraries, this.currentLibrary, this.actors, this.types)
-        if (Array.isArray(ml)) {
-          base = [...base, ...ml]
-        }
+        // module enums
+        Object.values(m.enums || {})
+          .forEach(enm => {
+            const tp = jclone(this.types['bluep/enum'])
+            tp.code += `/${enm.code}`
+            tp.name = `Enum: ${enm.name}`
+            ret[tp.code] = tp
+          })
+        // module structs
+        Object.values(m.structs || {})
+          .forEach(enm => {
+            const tp = jclone(this.types['bluep/struct'])
+            tp.code += `/${enm.code}`
+            tp.name = `Struct: ${enm.name}`
+            ret[tp.code] = tp
+          })
+        // module defined types
+        // to override automated color
+        const tps = jclone(m.types || {})
+        base = { ...base, ...tps }
       })
 
       return base
@@ -782,6 +860,7 @@ export default {
       :selectedElement="selectedElement"
       :isSaved="isSaved"
       :icons="options.icons"
+      :canRun="options.canRun"
       @selectLibrary="selectLibrary"
       @createLibrary="createLibrary"
       @viewLibrary="viewCurrentLibrary"
@@ -879,7 +958,7 @@ export default {
 </template>
 
 <style lang="scss" scoped>
-@import '@/assets/style.scss';
+@import './style.scss';
 
 .editor {
   background-color: $bgColor;

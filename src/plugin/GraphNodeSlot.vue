@@ -1,5 +1,6 @@
 <script>
 import ValueWidget from './ValueWidget.vue'
+import { slotTemplateAcceptType } from './graph.js'
 
 export default {
   components: {
@@ -64,7 +65,6 @@ export default {
     mouseUp () {
       if (!this.dragSlot) return
       if (!this.slotEnabled(false)) return
-      // console.log('drop!', this.slot, this.node)
       this.$emit('dropped', {
         slot: {
           ...this.slot,
@@ -83,15 +83,28 @@ export default {
 
       if (this.dragSlot.node.id === this.node.id) return false
       if (this.dragSlot.slot.direction === this.direction) return false
-      if (this.dragSlot.type !== this.realType && this.realType !== 'basic/template') return false
+      if (!this.acceptType(this.dragSlot.type)) return false
+      // if (this.dragSlot.type !== this.realType && this.realType !== 'basic/template') return false
       if (!this.dragSlot.slot.isArray !== !this.slot.isArray) return false
       return true
+    },
+    acceptType (tp) {
+      if (tp === this.realType) return true
+      if (this.realType === 'basic/template') {
+        const template = this.node.templates[this.slot.template]
+        return slotTemplateAcceptType(template, tp)
+      }
+      return false
     }
   },
   computed: {
     realType () {
       const type = this.slot.type
       // template case
+      if (this.slot.type === 'basic/template') {
+        const tpl = this.node.templates[this.slot.template]
+        return tpl.type || type
+      }
       return type
     },
     getColor () {
@@ -180,7 +193,7 @@ export default {
 </template>
 
 <style lang="scss" scoped>
-@import '@/assets/style.scss';
+@import './style.scss';
 
 .connector {
   position: absolute;

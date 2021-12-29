@@ -1,5 +1,5 @@
 <script>
-import { waitFor } from '@/utils.js'
+import { waitFor } from './utils.js'
 
 export default {
   props: [
@@ -124,7 +124,7 @@ export default {
 </template>
 
 <style lang="scss" scoped>
-@import '@/assets/style.scss';
+@import './style.scss';
 
 .in-slot {
   font-size: $graphTextSize - 2;

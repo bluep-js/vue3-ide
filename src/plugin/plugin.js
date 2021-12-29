@@ -1,8 +1,8 @@
 // Import vue component
-import BluepJsEditor from './components/Editor.vue'
+import BluepJsEditor from './Editor.vue'
 
 // Declare install function executed by Vue.use()
-export function install(Vue, options) {
+export function install (Vue, options) {
   if (install.installed) return
   install.installed = true
   const name = options && options.component ? options.component : 'BluepJsEditor'

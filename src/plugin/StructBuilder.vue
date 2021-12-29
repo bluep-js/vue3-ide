@@ -1,5 +1,5 @@
 <script>
-import { jclone } from '@/utils.js'
+import { jclone } from './utils.js'
 import VariableButton from './PanelVariableButton.vue'
 import VariablePanel from './GraphVariablePanel.vue'
 
@@ -161,7 +161,7 @@ export default {
 </template>
 
 <style lang="scss" scoped>
-@import '@/assets/style.scss';
+@import './style.scss';
 
 .wrapper {
   display: flex;

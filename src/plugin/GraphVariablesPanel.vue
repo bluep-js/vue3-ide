@@ -62,12 +62,16 @@ export default {
   <div class="bluep-panel">
     <div class="panel-header">
       <div class="title d-flex">
-        <i v-if="!fn.event" :class="icons.function + ' ' + icons.fw"></i>
-        <i v-else :class="icons.event + ' ' + icons.fw"></i>
+        <div class="title-icon">
+          <i v-if="!fn.event" :class="icons.function + ' ' + icons.fw"></i>
+          <i v-else :class="icons.event + ' ' + icons.fw"></i>
+        </div>
+        <div class="title-input">
         <!--
         <span v-if="!canBeRenamed">{{fnname}}</span>
         -->
-        <input type="text" class="panel-input text-dark" @input="updateName" v-model="fnname"/>
+          <input type="text" class="panel-input text-dark" @input="updateName" v-model="fnname"/>
+        </div>
       </div>
     </div>
     <div class="panel-header" v-if="confs.length">
@@ -171,16 +175,16 @@ export default {
 </template>
 
 <style lang="scss" scoped>
-@import '@/assets/style.scss';
+@import './style.scss';
 
 .title {
-  font-weight: bold;
-  // border-bottom: 1px dashed $borderColor;
-  // margin-bottom: $panelPadding;
-  // padding: $panelPadding;
+  .title-icon {
+    flex: 0 0 30px;
+    font-weight: bold;
+  }
 
-  input {
-    padding-left: 5px;
+  .title-input {
+    flex: 1 1 auto;
   }
 }
 

@@ -1,5 +1,5 @@
 <script>
-import { jclone } from '@/utils.js'
+import { jclone } from './utils.js'
 
 export default {
   props: [
@@ -21,7 +21,7 @@ export default {
   },
   methods: {
     updateLibrary () {
-      console.log('upd', this.name, this.options)
+      // console.log('upd', this.name, this.options)
     },
     deleteLibrary () {
       if (!confirm(`Delete library <${this.name}? All library content will be lost!`)) return
@@ -81,7 +81,7 @@ export default {
 </template>
 
 <style lang="scss" scoped>
-@import '@/assets/style.scss';
+@import './style.scss';
 
 .controls {
   display: flex;

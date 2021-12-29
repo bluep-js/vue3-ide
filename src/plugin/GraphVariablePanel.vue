@@ -2,7 +2,7 @@
 import ValueWidget from './ValueWidget.vue'
 import VariableIcon from './VariableIcon.vue'
 
-import { waitFor } from '@/utils.js'
+import { waitFor } from './utils.js'
 
 export default {
   components: {
@@ -164,7 +164,7 @@ export default {
       <div v-else>
         <table>
           <tr>
-            <td>{{vr.name}}</td>
+            <td class="no-wrap pr-5p">{{vr.name}}</td>
             <td>
               <ValueWidget
                 v-model="vr.value"
@@ -188,7 +188,7 @@ export default {
 </template>
 
 <style lang="scss" scoped>
-@import '@/assets/style.scss';
+@import './style.scss';
 
 td {
   text-align: left;

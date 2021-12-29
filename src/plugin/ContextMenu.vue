@@ -146,7 +146,7 @@ export default {
 </template>
 
 <style lang="scss">
-@import '@/assets/style.scss';
+@import './style.scss';
 
 .context-menu {
   position: absolute;

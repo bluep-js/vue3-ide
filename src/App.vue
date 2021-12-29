@@ -1,5 +1,5 @@
 <script>
-import Editor from './components/Editor.vue'
+import Editor from './plugin/Editor.vue'
 
 export default {
   name: 'App',
