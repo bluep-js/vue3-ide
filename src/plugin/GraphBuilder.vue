@@ -3,6 +3,8 @@ import GraphNode from './GraphNode.vue'
 import GraphEdge from './GraphEdge.vue'
 import ContextMenu from './ContextMenu.vue'
 
+import { jclone } from './utils.js'
+
 export default {
   name: 'GraphBuilder',
   components: {
@@ -48,19 +50,150 @@ export default {
     this.resizeUpdate()
     window.addEventListener('resize', this.resizeUpdate)
   },
+  created () {
+    this.validate()
+  },
   beforeUnmount () {
     window.removeEventListener('resize', this.resizeUpdate)
   },
   watch: {
     modelValue: {
-      handler (next) {
+      handler (next, prev) {
         this.graph = next.graph
         this.layout = next.layout
+        if (!prev || (next && prev && next.code !== prev.code)) this.validate()
       },
       deep: true
     }
   },
   methods: {
+    validate () {
+      if (!this.modelValue) return
+      // console.log('validate', this.modelValue)
+      Object.keys(this.graph.nodes).forEach(ncode => {
+        let nodeValid = true
+
+        // call node
+        if (ncode.startsWith('graph/call')) {
+          Object.keys(this.modelValue.context.inputs).forEach(fcode => {
+            const inp = this.modelValue.context.inputs[fcode]
+            if (!this.graph.nodes[ncode].outputs[fcode]) {
+              this.graph.nodes[ncode].outputs[fcode] = jclone(inp)
+            } else {
+              const out = this.graph.nodes[ncode].outputs[fcode]
+              if ((out.type !== inp.type || out.isArray !== inp.isArray) && Object.keys(out.connections || {}).length) nodeValid = false
+              this.graph.nodes[ncode].outputs[fcode].name = inp.name
+              this.graph.nodes[ncode].outputs[fcode].type = inp.type
+              this.graph.nodes[ncode].outputs[fcode].isArray = inp.isArray
+            }
+          })
+          // removed inputs
+          Object.keys(this.graph.nodes[ncode].outputs).forEach(fcode => {
+            if (fcode === 'call') return
+            if (!this.modelValue.context.inputs[fcode]) {
+              if (Object.keys(this.graph.nodes[ncode].outputs[fcode].connections || {}).length) {
+                nodeValid = false
+              } else {
+                delete this.graph.nodes[ncode].outputs[fcode]
+              }
+            }
+          })
+        }
+
+        // return nodes
+        if (ncode.startsWith('graph/return')) {
+          Object.keys(this.modelValue.context.outputs).forEach(fcode => {
+            const out = this.modelValue.context.outputs[fcode]
+            if (!this.graph.nodes[ncode].inputs[fcode]) {
+              this.graph.nodes[ncode].inputs[fcode] = jclone(out)
+            } else {
+              const inp = this.graph.nodes[ncode].inputs[fcode]
+              if ((out.type !== inp.type || out.isArray !== inp.isArray) && Object.keys(inp.connections || {}).length) nodeValid = false
+              this.graph.nodes[ncode].inputs[fcode].name = out.name
+              this.graph.nodes[ncode].inputs[fcode].type = out.type
+              this.graph.nodes[ncode].inputs[fcode].isArray = out.isArray
+            }
+          })
+          // removed outputs
+          Object.keys(this.graph.nodes[ncode].inputs).forEach(fcode => {
+            if (fcode === 'call') return
+            if (!this.modelValue.context.outputs[fcode]) {
+              if (Object.keys(this.graph.nodes[ncode].inputs[fcode].connections || {}).length) {
+                nodeValid = false
+              } else {
+                delete this.graph.nodes[ncode].inputs[fcode]
+              }
+            }
+          })
+        }
+
+        // function nodes
+        if (ncode.startsWith('graph/function')) {
+          const ndata = this.graph.nodes[ncode].data
+          if (!this.libraries[ndata.library] || !this.libraries[ndata.library].functions || !this.libraries[ndata.library].functions[ndata.fid]) {
+            nodeValid = false
+          } else {
+            const src = this.libraries[ndata.library].functions[ndata.fid]
+            // inputs
+            Object.keys(src.context.inputs).forEach(fcode => {
+              const inp = src.context.inputs[fcode]
+              if (!this.graph.nodes[ncode].inputs[fcode]) {
+                this.graph.nodes[ncode].inputs[fcode] = jclone(inp)
+              } else {
+                const out = this.graph.nodes[ncode].inputs[fcode]
+                if ((out.type !== inp.type || out.isArray !== inp.isArray) && Object.keys(out.connections || {}).length) nodeValid = false
+                this.graph.nodes[ncode].inputs[fcode].name = inp.name
+                this.graph.nodes[ncode].inputs[fcode].type = inp.type
+                this.graph.nodes[ncode].inputs[fcode].isArray = inp.isArray
+              }
+            })
+            // removed inputs
+            Object.keys(this.graph.nodes[ncode].inputs).forEach(fcode => {
+              if (fcode === 'call') return
+              if (!src.context.inputs[fcode]) {
+                if (Object.keys(this.graph.nodes[ncode].inputs[fcode].connections || {}).length) {
+                  nodeValid = false
+                } else {
+                  delete this.graph.nodes[ncode].inputs[fcode]
+                }
+              }
+            })
+            // outputs
+            Object.keys(src.context.outputs).forEach(fcode => {
+              const out = src.context.outputs[fcode]
+              if (!this.graph.nodes[ncode].outputs[fcode]) {
+                this.graph.nodes[ncode].outputs[fcode] = jclone(out)
+              } else {
+                const inp = this.graph.nodes[ncode].outputs[fcode]
+                if ((out.type !== inp.type || out.isArray !== inp.isArray) && Object.keys(inp.connections || {}).length) nodeValid = false
+                this.graph.nodes[ncode].outputs[fcode].name = out.name
+                this.graph.nodes[ncode].outputs[fcode].type = out.type
+                this.graph.nodes[ncode].outputs[fcode].isArray = out.isArray
+              }
+            })
+            // removed outputs
+            Object.keys(this.graph.nodes[ncode].outputs).forEach(fcode => {
+              if (fcode === 'return') return
+              if (!src.context.outputs[fcode]) {
+                if (Object.keys(this.graph.nodes[ncode].outputs[fcode].connections || {}).length) {
+                  nodeValid = false
+                } else {
+                  delete this.graph.nodes[ncode].outputs[fcode]
+                }
+              }
+            })
+          }
+        }
+
+        // TODO
+        // variable nodes
+        // new nodes
+        // methods nodes
+        // constructor nodes
+
+        this.graph.nodes[ncode].valid = nodeValid
+      })
+    },
     resizeUpdate () {
       // console.log('resize update', this.$refs.field)
     },
@@ -196,9 +329,13 @@ export default {
 
       this.emitUpdate()
     },
+
+    /* slot clear */
     slotClear ({ node, slot }) {
       Object.keys(this.graph.nodes[node.id][slot.direction][slot.code].connections).forEach(eid => this.deleteEdge(eid))
     },
+
+    /* slot shifted */
     slotShifted (info) {
       // console.log('slot shifted', info)
       Object.keys(info.slot.connections || {}).forEach(eid => {
@@ -234,6 +371,7 @@ export default {
       }
       delete this.layout.parts[eid]
       delete this.graph.edges[eid]
+      this.validate()
       this.emitUpdate()
     },
 
@@ -471,6 +609,7 @@ export default {
         />
         <!--
         @dragged="nodeDragged(nd, $event)"
+        :fn="modelValue"
         -->
       </svg>
       <GraphNode

@@ -10,7 +10,8 @@ export default {
     'name',
     'types',
     'variables',
-    'icons'
+    'icons',
+    'readOnly'
   ],
   emits: [
     'addVariable',
@@ -29,21 +30,27 @@ export default {
 <div class="wrapper">
   <div class="header">
     <span>{{name}}</span>
-    <button @click="$emit('addVariable')" class="icon-button">
-      <i :class="icons.add"></i>
-    </button>
+    <div>
+      <button v-if="!readOnly" @click="$emit('addVariable')" class="icon-button">
+        <i :class="icons.add"></i>
+      </button>
+    </div>
   </div>
-  <div
-    v-for="v of vars"
-    :key="v.code"
-  >
-    <VariableButton
-      :variable="v"
-      :icons="icons"
-      :types="types"
-      @click="$emit('editVariable', v.code)"
-      @remove="$emit('deleteVariable', v.code)"
-    />
+  <div class="body">
+    <div
+      v-for="v of vars"
+      :key="v.code"
+    >
+      <VariableButton
+        :variable="v"
+        :icons="icons"
+        :types="types"
+        :noRemove="readOnly"
+        :noClick="readOnly"
+        @click="$emit('editVariable', v.code)"
+        @remove="$emit('deleteVariable', v.code)"
+      />
+    </div>
   </div>
 </div>
 </template>
@@ -54,5 +61,12 @@ export default {
 .header {
   display: flex;
   justify-content: space-between;
+  background-color: $panelHeaderBackground;
+  margin-bottom: 5px;
+  padding-left: 10px;
+}
+
+.body {
+  padding-left: 10px;
 }
 </style>

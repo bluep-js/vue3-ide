@@ -1,16 +1,20 @@
 <script>
+import { classCombined } from './graph.js'
+import { jclone, waitFor } from './utils.js'
 // import { defineAsyncComponent } from 'vue'
 
 // import ExecuteNode from './nodes/Execute'
 import GraphNodeSlot from './GraphNodeSlot.vue'
 
 export default {
+  name: 'GraphNode',
   components: {
     GraphNodeSlot
   },
   props: [
     'libraries',
     'currentLibrary',
+    // 'fn',
     'modelValue',
     'types',
     'layout',
@@ -35,11 +39,62 @@ export default {
       boundingRect: null // rect
     }
   },
-  created () {
-    setTimeout(() => {
-      const ro = new ResizeObserver(this.resizeUpdate)
-      ro.observe(this.$refs.graphNode)
-    }, 0)
+  async created () {
+    // console.log('node created', this.node, this.fn)
+    await waitFor(0)
+    const ro = new ResizeObserver(this.resizeUpdate)
+    ro.observe(this.$refs.graphNode)
+  },
+  watch: {
+    'node.inputs.of': {
+      deep: true,
+      handler (next, prev) {
+        // console.log('next of', next, prev)
+        // if (next && prev && next.value === prev.value) return
+        Object.keys(this.node.inputs).forEach(incode => {
+          if (incode === 'call' || incode === 'of') return
+          if (Object.keys(this.node.inputs[incode].connections || {}).length) {
+            this.$emit('slotClear', {
+              node: this.node,
+              slot: {
+                direction: 'inputs',
+                code: incode
+              }
+            })
+          }
+          delete this.node.inputs[incode]
+        })
+        const codes = (next.value || '').split('/')
+        if (codes.length >= 3) {
+          const cls = classCombined(codes[2], this.currentLibrary, this.libraries)
+          if (!cls) {
+            console.error('!! no cls', codes)
+            return
+          }
+          this.node.data = {
+            library: cls.library,
+            class: cls.code,
+            fn: null
+          }
+          if (codes.length === 4) {
+            this.node.data.fn = codes[3]
+          }
+          if (this.node.data.fn) {
+            const fn = cls.methods[this.node.data.fn] || cls.deep.methods[this.node.data.fn] || null
+            if (fn) {
+              Object.keys(fn.context.inputs || {}).forEach(incode => {
+                this.node.inputs[incode] = jclone(fn.context.inputs[incode])
+              })
+            }
+          }
+          this.node.outputs.object.type = `bluep/class/${cls.code}`
+          this.node.name = `New ${cls.name}`
+        } else {
+          console.error('wrong code', next.value)
+        }
+        this.$emit('update:modelValue', this.node)
+      }
+    }
   },
   methods: {
     resizeUpdate () {
@@ -65,10 +120,29 @@ export default {
     nodeClass () {
       const typeClass = this.node.code.replaceAll('/', '-')
       const high = this.highlighted ? ' node-highlighted ' : ' '
-      return typeClass + high + ' node-type-' + this.node.type + ' '
+      const valid = typeof this.node.valid === 'boolean'
+        ? this.node.valid
+          ? ' '
+          : 'node-not-valid'
+        : ' '
+      return typeClass + high + ' node-type-' + this.node.type + ' ' + valid + ' '
+    },
+    newClass () {
+      if (!this.node.code.startsWith('class/new')) return null
+      const clsCodes = this.node.inputs.of.value
+      if (!clsCodes) return null
+      // if (this.node.data && this.node.data.codes === clsCodes) removeFirst = true
+      const codes = clsCodes.split('/')
+      if (codes.length >= 3) {
+        const cls = classCombined(codes[2], this.currentLibrary, this.libraries)
+        return cls
+      }
+      return null
     },
     slotsRows () {
       const inputs = this.node.inputs ? Object.keys(this.node.inputs) : []
+      /**/
+      /**/
       const outputs = this.node.outputs ? Object.keys(this.node.outputs) : []
       const length = inputs.length > outputs.length ? inputs.length : outputs.length
       const ret = []
@@ -242,6 +316,7 @@ export default {
       right: 2px;
       display: none;
       cursor: pointer;
+      width: 25px;
 
       svg {
         fill: #c33;
@@ -282,6 +357,7 @@ export default {
         transform: translateX(-50%) translateY(-50%);
         z-index: 5;
         cursor: pointer;
+        width: 25px;
 
         svg {
           fill: #c33;
@@ -303,6 +379,10 @@ export default {
     .node-header {
       background-color: $nodeColorExecute;
     }
+  }
+
+  &.node-not-valid {
+    border: 2px solid red !important;
   }
 }
 

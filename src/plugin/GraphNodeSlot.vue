@@ -1,6 +1,6 @@
 <script>
 import ValueWidget from './ValueWidget.vue'
-import { slotTemplateAcceptType } from './graph.js'
+import { slotTemplateAcceptType, classIsParentOfClass } from './graph.js'
 
 export default {
   components: {
@@ -94,6 +94,15 @@ export default {
         const template = this.node.templates[this.slot.template]
         return slotTemplateAcceptType(template, tp)
       }
+      if (this.realType.startsWith('bluep/class/') && tp.startsWith('bluep/class/')) {
+        const clss1 = this.realType.split('/')
+        const clss2 = tp.split('/')
+        const cls1 = clss1[2]
+        const cls2 = clss2[2]
+        return this.direction === 'inputs'
+          ? classIsParentOfClass(cls1, cls2, this.libraries)
+          : classIsParentOfClass(cls2, cls1, this.libraries)
+      }
       return false
     }
   },
@@ -126,15 +135,23 @@ export default {
       if (this.slot.manual === false) return false
       if (this.slot.isArray) return false
       if (this.slot.type === 'basic/execute') return false
+      if (this.slot.type === 'basic/datetime') return false
+      if (this.slot.type === 'bluep/classselector') return true
       if (this.slot.type.startsWith('bluep/struct')) return false
+      if (this.slot.type.startsWith('bluep/class')) return false
       if (this.slot.type.startsWith('bluep/object')) return false
       if (Object.keys(this.slot.connections || {}).length) return false
+      return true
+    },
+    canConnect () {
+      if (this.slot.type === 'bluep/classselector') return false
       return true
     },
     connectorClass () {
       const list = ['connector']
       if (this.slot.isArray) list.push('is-array')
-      list.push(`connector-${this.slot.type.replaceAll('/', '-')}`)
+      if (this.slot.type) list.push(`connector-${this.slot.type.replaceAll('/', '-')}`)
+      if (!this.canConnect) list.push('connector-invisible')
       return list.join(' ')
     }
   },
@@ -186,6 +203,7 @@ export default {
     :style="{
       backgroundColor: getColor
     }"
+    :title="slot.type"
     @mouseup="mouseUp"
     @mousedown.stop.prevent="mouseDown"
   ></div>
@@ -203,9 +221,13 @@ export default {
   border-radius: 5px;
 
   &.is-array {
-    top: 3px;
+    top: 1px;
     border-radius: 2px;
     transform: rotate(45deg);
+  }
+
+  &.connector-invisible {
+    visibility: hidden;
   }
 }
 

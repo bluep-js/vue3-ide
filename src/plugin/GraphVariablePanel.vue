@@ -17,7 +17,8 @@ export default {
     'types',
     'icons',
     'context',
-    'direction'
+    'direction',
+    'withAccess'
   ],
   emits: [
     'variableUpdated',
@@ -71,6 +72,10 @@ export default {
       this.undefineValue()
       this.$emit('typeChanged')
     },
+    accessChanged () {
+      // this.undefineValue()
+      this.$emit('typeChanged')
+    },
     defineValue () {
       this.vr.value = null
       this.$emit('variableUpdated', this.vr)
@@ -116,6 +121,20 @@ export default {
               :class="{ error: errors.name }"
               :title="errors.name || 'Variable name'"
             />
+          </td>
+        </tr>
+        <tr v-if="withAccess">
+          <td>Access</td>
+          <td>
+            <select
+              v-model="vr.access"
+              class="panel-input text-dark w-100"
+              @change="accessChanged"
+            >
+              <option value="public">public</option>
+              <option value="protected">protected</option>
+              <option value="private">private</option>
+            </select>
           </td>
         </tr>
         <tr>

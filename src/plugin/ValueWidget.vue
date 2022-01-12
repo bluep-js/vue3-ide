@@ -1,5 +1,6 @@
 <script>
 import { waitFor } from './utils.js'
+import { classCombined } from './graph.js'
 
 export default {
   props: [
@@ -39,6 +40,40 @@ export default {
       const ecode = this.info.type.split('/').pop()
       const enm = this.libraries[this.currentLibrary].enums[ecode]
       return enm.values
+    },
+    constructorsOptions () {
+      const ret = []
+      Object.values(this.libraries[this.currentLibrary].classes || {}).forEach(cc => {
+        const cls = classCombined(cc.code, cc.library, this.libraries)
+        const fns = []
+        // search direct class constructors
+        Object.values(cls.methods || {}).forEach(m => {
+          if (m.type === 'constructor') {
+            const args = Object.values(m.context.inputs || {}).map(inp => inp.name)
+            fns.push({
+              label: `${cls.name}(${args.join(',')})`,
+              value: `bluep/class/${cls.code}/${m.code}`
+            })
+          }
+        })
+        // search parents constructors
+        if (!fns.length) {
+          Object.values(cls.deep.methods || {}).forEach(m => {
+            if (m.type === 'constructor') {
+              const args = Object.values(m.context.inputs || {}).map(inp => inp.name)
+              fns.push({
+                label: `${cls.name}(${args.join(',')})`,
+                value: `bluep/class/${cls.code}/${m.code}`
+              })
+            }
+          })
+        }
+        // console.log(cls)
+        fns.forEach(f => {
+          ret.push(f)
+        })
+      })
+      return ret
     }
   },
   methods: {
@@ -61,6 +96,9 @@ export default {
         }
       }
       if (this.info.type.startsWith('bluep/enum')) {
+        this.val = next.target.value
+      }
+      if (this.info.type === 'bluep/classselector') {
         this.val = next.target.value
       }
       this.$emit('update:modelValue', this.val)
@@ -115,10 +153,25 @@ export default {
         :selected="opt === val"
       >{{enumValues[opt]}}</option>
     </select>
+    <select
+      v-if="info.type === 'bluep/classselector' && (inSlot || !inWidget || inPanel)"
+      :class="{'in-slot': inSlot, 'bg-white': !inSlot && !inPanel, 'panel-input text-dark': inPanel}"
+      @change="updateValue"
+      v-model="val"
+    >
+      <option
+        v-for="opt, oi of constructorsOptions"
+        :key="oi"
+        :value="opt.value"
+        :selected="opt.value === val"
+      >{{opt.label}}</option>
+    </select>
+    <!--
     <button @click="updateValue(!val)" v-if="info.type === 'basic/boolean' && (inWidget || inPanel)" class="button-clear">
       <i v-if="!!val" class="fas fa-2x fa-toggle-on text-primary"></i>
       <i v-else class="fas fa-2x fa-toggle-off"></i>
     </button>
+    -->
   </div>
 </div>
 </template>

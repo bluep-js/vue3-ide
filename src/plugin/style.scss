@@ -6,6 +6,7 @@ $textColor: #ddd;
 
 $nodeTypeExecute: #619298;
 $nodeTypeModifier: #69bd70;
+$panelHeaderBackground: #474f52;
 
 $panelWidth: 320px;
 $panelPadding: 4px;
@@ -29,8 +30,14 @@ $panelTextSize: 22px;
       display: flex;
       justify-content: space-between;
       border-bottom: 1px dashed $borderColor;
+      margin-top: $panelPadding;
       margin-bottom: $panelPadding;
       padding: $panelPadding;
+      background-color: $panelHeaderBackground;
+
+      &:first-child {
+        margin-top: 0;
+      }
     }
 
     .panel-body {
@@ -130,6 +137,25 @@ select.panel-input {
   }
 }
 
+.panel-row {
+  display: flex;
+
+  .panel-row-label {
+    flex: 0 0 math.div($panelWidth, 2);
+  }
+
+  .panel-row-widget {
+    flex: 1 1 auto;
+
+    .panel-input {
+      // width: 100%;
+    }
+  }
+}
+
+.t-left {
+  text-align: left;
+}
 .w-50 {
   width: 50%;
 }
@@ -138,8 +164,17 @@ select.panel-input {
   width: 100%;
 }
 
+.w-auto {
+  width: auto !important;
+}
+
 .d-flex {
   display: flex !important;
+}
+
+.d-flex-jcb {
+  display: flex !important;
+  justify-content: space-between;
 }
 
 .flex-row {
@@ -148,6 +183,9 @@ select.panel-input {
 }
 // margins
 // px
+.mr-5 {
+  margin-right: 5px;
+}
 .ml-5 {
   margin-left: 5px;
 }
@@ -173,6 +211,11 @@ select.panel-input {
 // paddings
 .pr-5p {
   padding-right: 5px;
+}
+
+.px-5p {
+  padding-right: 5px;
+  padding-left: 5px;
 }
 
 .bg-white {
