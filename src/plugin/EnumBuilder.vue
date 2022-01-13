@@ -57,16 +57,24 @@ export default {
       Enum properties
     </div>
     <div class="panel-body">
-      <div class="mt-2r mb-2">
-        <label>Code</label>
-        <input class="text-dark panel-input" type="text" disabled v-model="enumData.code"/>
+      <div class="mt-2r mb-2 panel-row">
+        <div class="panel-row-label">
+          <label>Code</label>
+        </div>
+        <div class="panel-row-widget">
+          <input class="text-dark panel-input" type="text" disabled v-model="enumData.code"/>
+        </div>
       </div>
-      <div class="mb-2r">
-        <label>Name</label>
-        <input class="text-dark panel-input" type="text" v-model="enumData.name" @update:modelValue="saved = false"/>
-        <blockquote v-if="nameError" class="danger">
-          <i>Exists or empty</i>
-        </blockquote>
+      <div class="mb-2r panel-row">
+        <div class="panel-row-label">
+          <label>Name</label>
+        </div>
+        <div class="panel-row-widget">
+          <input class="text-dark panel-input" type="text" v-model="enumData.name" @update:modelValue="saved = false"/>
+          <blockquote v-if="nameError" class="danger">
+            <i>Exists or empty</i>
+          </blockquote>
+        </div>
       </div>
     </div>
     <div class="panel-header">
@@ -98,5 +106,5 @@ export default {
 </template>
 
 <style lang="scss" scoped>
-@import '@/assets/style.scss';
+@import './style.scss';
 </style>

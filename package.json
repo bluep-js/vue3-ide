@@ -1,6 +1,6 @@
 {
   "name": "@bluepjs/vue3-ide",
-  "version": "0.1.1",
+  "version": "0.2.2",
   "description": "IDE for @bluepjs blueprints",
   "main": "./dist/editor.common.js",
   "module": "./dist/editor.umd.min.js",
@@ -9,7 +9,7 @@
   ],
   "scripts": {
     "serve": "vue-cli-service serve",
-    "build": "vue-cli-service build --target lib --name editor ./src/plugin.js",
+    "build": "vue-cli-service build --target lib --name editor ./src/plugin/plugin.js",
     "lint": "vue-cli-service lint"
   },
   "keywords": ["bluepjs","ide","blueprint","editor"],

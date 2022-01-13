@@ -21,6 +21,10 @@ export default {
     icons: {
       type: Object,
       default: () => null
+    },
+    canRun: {
+      type: Boolean,
+      default: true
     }
   },
   emits: [
@@ -70,27 +74,40 @@ export default {
 <div class="topbar-wrapper bluep-panel-wrapper">
   <div class="library-selector">
     <span>Library:</span>
-    <select @change="librarySelectorChange" class="panel-input text-dark">
-      <option
-        value=""
-        v-if="!currentLibrary"
-      >Select</option>
-      <option
-        v-for="lib of librariesList"
-        :key="lib.code"
-        :value="lib.code"
-        :selected="currentLibrary === lib.code"
-      >{{lib.name}}</option>
-      <option value="add" disabled>Create New</option>
-    </select>
-    <button :disabled="!currentLibrary" @click="$emit('viewLibrary')" class="icon-button">
-      <i :class="icons.view + ' ' + icons.fw"></i>
-    </button>
+    <div class="ml-5 no-wrap">
+      <select @change="librarySelectorChange" class="panel-input text-dark">
+        <option
+          value=""
+          v-if="!currentLibrary"
+        >Select</option>
+        <option
+          v-for="lib of librariesList"
+          :key="lib.code"
+          :value="lib.code"
+          :selected="currentLibrary === lib.code"
+        >{{lib.name}}</option>
+        <option value="add" disabled>Create New</option>
+      </select>
+      <button :disabled="!currentLibrary" @click="$emit('viewLibrary')" class="icon-button">
+        <i :class="icons.view + ' ' + icons.fw"></i>
+      </button>
+    </div>
   </div>
   <div class="current-path">
     <div class="selected-element-path" v-if="selectedElement">
       <i :class="icons.library + ' ' + icons.fw"></i>
       <span style="margin-left: 5px;">{{currentLibraryName}}</span>
+      <span v-if="selectedElement.type === 'class' || selectedElement.type === 'method' || selectedElement.type === 'constructor'">
+        <b>|</b>
+        <i :class="icons.class + ' ' + icons.fw"></i>
+        <span v-if="selectedElement.type === 'class'" style="margin-left: 5px;">{{selectedElement.name}}</span>
+        <span v-else style="margin-left: 5px;">{{libraries[selectedElement.library].classes[selectedElement.class].name}}</span>
+        <span v-if="selectedElement.type === 'method' || selectedElement.type === 'constructor'">
+          <b>|</b>
+          <i :class="icons.function + ' ' + icons.fw"></i>
+          <span style="margin-left: 5px;">{{selectedElement.name}}</span>
+        </span>
+      </span>
       <span v-if="selectedElement.type === 'function'">
         <b>|</b>
         <i v-if="!selectedElement.event" :class="icons.function + ' ' + icons.fw"></i>
@@ -112,7 +129,7 @@ export default {
   <div class="controls">
     <button class="icon-button" :disabled="isSaved" @click="$emit('saveClick')"><i :class="icons.save + ' ' + icons.fw"></i> Save</button>
     <button
-      v-if="selectedElement?.type === 'function' && !selectedElement?.event"
+      v-if="canRun && selectedElement?.type === 'function' && !selectedElement?.event"
       class="icon-button"
       :disabled="!isSaved"
       @click="$emit('runClick')"
@@ -122,7 +139,7 @@ export default {
 </template>
 
 <style lang="scss" scoped>
-@import '@/assets/style.scss';
+@import './style.scss';
 
 .topbar-wrapper {
   display: flex;

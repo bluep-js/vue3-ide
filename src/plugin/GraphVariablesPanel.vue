@@ -10,6 +10,7 @@ export default {
   },
   props: [
     'fn',
+    'cls',
     'types',
     'icons',
     'isMethod'
@@ -38,6 +39,10 @@ export default {
         ret.push(f)
       })
       return ret
+    },
+    canBeRenamed () {
+      if (this.fn.type === 'constructor') return false
+      return true
     }
   },
   methods: {
@@ -62,12 +67,14 @@ export default {
   <div class="bluep-panel">
     <div class="panel-header">
       <div class="title d-flex">
-        <i v-if="!fn.event" :class="icons.function + ' ' + icons.fw"></i>
-        <i v-else :class="icons.event + ' ' + icons.fw"></i>
-        <!--
-        <span v-if="!canBeRenamed">{{fnname}}</span>
-        -->
-        <input type="text" class="panel-input text-dark" @input="updateName" v-model="fnname"/>
+        <div class="title-icon">
+          <i v-if="!fn.event" :class="icons.function + ' ' + icons.fw"></i>
+          <i v-else :class="icons.event + ' ' + icons.fw"></i>
+        </div>
+        <div class="title-input">
+          <span v-if="!canBeRenamed">{{fnname}}</span>
+          <input v-else type="text" class="panel-input text-dark" @input="updateName" v-model="fnname"/>
+        </div>
       </div>
     </div>
     <div class="panel-header" v-if="confs.length">
@@ -86,54 +93,6 @@ export default {
     </div>
     <div class="panel-header" v-if="confs.length"/>
     <div class="panel-body">
-      <!--
-      <div v-if="canBeExposed">
-        <label for="expose-check">
-          <input id="expose-check" type="checkbox" @update:modelValue="updateExpose" v-model="exposed"/>
-          Expose
-        </label>
-        <label v-if="exposed" for="expose-autorun">
-          <input id="expose-autorun" type="checkbox" @update:modelValue="updateAutorun" v-model="autorun"/>
-          Run on changes
-        </label>
-      </div>
-      <div v-if="isInterval">
-        <table>
-          <tr>
-            <td><label>Interval (ms)</label></td>
-            <td>
-              <ValueWidget
-                :info="{
-                  name: 'Interval (ms)',
-                  type: 'basic/number'
-                }"
-                v-model="interval"
-                :inPanel="true"
-                @update:modelValue="$emit('updateInterval', $event)"
-              />
-            </td>
-          </tr>
-        </table>
-      </div>
-      <div v-if="isCron">
-        <table>
-          <tr>
-            <td><label>Cron</label></td>
-            <td>
-              <ValueWidget
-                :info="{
-                  name: 'Cron',
-                  type: 'basic/string'
-                }"
-                v-model="cron"
-                :inPanel="true"
-                @update:modelValue="updateCron"
-              />
-            </td>
-          </tr>
-        </table>
-      </div>
-      -->
       <GraphVariablesBar
         v-if="!fn.event"
         :name="'Inputs'"
@@ -165,22 +124,30 @@ export default {
         @deleteVariable="$emit('deleteVariable', { code: $event, path: 'variables' })"
         @editVariable="$emit('editVariable', { code: $event, path: 'variables' })"
       />
+      <GraphVariablesBar
+        v-if="cls"
+        :readOnly="true"
+        :name="'Properties'"
+        :types="types"
+        :variables="cls.schema"
+        :icons="icons"
+      />
     </div>
   </div>
 </div>
 </template>
 
 <style lang="scss" scoped>
-@import '@/assets/style.scss';
+@import './style.scss';
 
 .title {
-  font-weight: bold;
-  // border-bottom: 1px dashed $borderColor;
-  // margin-bottom: $panelPadding;
-  // padding: $panelPadding;
+  .title-icon {
+    flex: 0 0 30px;
+    font-weight: bold;
+  }
 
-  input {
-    padding-left: 5px;
+  .title-input {
+    flex: 1 1 auto;
   }
 }
 

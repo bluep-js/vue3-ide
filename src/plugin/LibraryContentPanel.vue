@@ -16,7 +16,8 @@ export default {
   ],
   data () {
     return {
-      addSelector: ''
+      addSelector: '',
+      opens: {}
     }
   },
   methods: {
@@ -87,6 +88,12 @@ export default {
       return Object.values(this.libraries[this.currentLibrary].functions || {})
     },
     /**
+      Library classes
+    */
+    libraryClasses () {
+      return Object.values(this.libraries[this.currentLibrary].classes || {})
+    },
+    /**
       Library events
     */
     eventsList () {
@@ -120,27 +127,76 @@ export default {
   <div class="bluep-panel">
     <div class="panel-header">
       <span class="title">Content</span>
-      <select v-model="addSelector" @change="addSelectorChange" class="panel-input text-dark">
-        <option value="">Add new</option>
-        <optgroup label="Basic">
-          <option value="function">Function</option>
-          <option value="class" disabled>Class</option>
-          <option value="struct">Struct</option>
-          <option value="enum">Enum</option>
-        </optgroup>
-        <optgroup label="Events" v-if="eventsList.length && libraries[currentLibrary].name === 'Default'">
-          <option
-            v-for="ev of eventsList"
-            :key="ev.code"
-            :value="ev.code"
-            :disabled="!ev.enabled"
-          >
-            {{ev.label}}
-          </option>
-        </optgroup>
-      </select>
+      <div class="ml-5">
+        <select v-model="addSelector" @change="addSelectorChange" class="panel-input text-dark">
+          <option value="">Add new</option>
+          <optgroup label="Basic">
+            <option value="function">Function</option>
+            <option value="class">Class</option>
+            <option value="struct">Struct</option>
+            <option value="enum">Enum</option>
+          </optgroup>
+          <optgroup label="Events" v-if="eventsList.length && libraries[currentLibrary].name === 'Default'">
+            <option
+              v-for="ev of eventsList"
+              :key="ev.code"
+              :value="ev.code"
+              :disabled="!ev.enabled"
+            >
+              {{ev.label}}
+            </option>
+          </optgroup>
+        </select>
+      </div>
     </div>
     <div class="panel-body">
+      <!-- classes -->
+      <div
+        v-for="cls of libraryClasses"
+        :key="cls.code"
+        :class="{selected: selectedElement?.code === cls.code}"
+      >
+        <div class="d-flex-jcb w-100">
+          <div class="list-item-text d-flex list-item-class">
+            <button @click="opens[cls.code] = !opens[cls.code]" :disabled="!Object.keys(cls.methods || {}).length" class="icon-button button-small">
+              <i v-if="opens[cls.code]" :class="icons.chevronDown"></i>
+              <i v-else :class="icons.chevronRight"></i>
+            </button>
+            <button @click="$emit('selectElement', cls)" class="w-100 t-left icon-button button-small">
+              <i :class="icons.class + ' ' + icons.fw"></i>
+              {{cls.name}}
+            </button>
+          </div>
+          <div class="list-item-controls">
+            <button @click="deleteElement(cls)" class="icon-button button-small">
+              <i :class="icons.remove" class="trash-icon"></i>
+            </button>
+          </div>
+        </div>
+        <div v-if="opens[cls.code]" class="class-methods">
+          <div
+            v-for="fn of Object.values(cls.methods || {})"
+            :key="fn.code"
+            class="list-item"
+            :class="{selected: selectedElement?.code === fn.code}"
+          >
+            <div class="list-item-text">
+              <button @click="$emit('selectElement', fn)" class="icon-button button-small">
+                <i :class="icons.function + ' ' + icons.fw" v-if="!fn.event"></i>
+                <i :class="icons.event + ' ' + icons.fw" v-else></i>
+                {{fn.name}}
+              </button>
+            </div>
+            <!--
+            <div class="list-item-controls">
+              <button @click="deleteElement(fn)" class="icon-button button-small">
+                <i :class="icons.remove" class="trash-icon"></i>
+              </button>
+            </div>
+            -->
+          </div>
+        </div>
+      </div>
       <!-- functions -->
       <div
         v-for="fn of libraryFunctions"
@@ -207,23 +263,30 @@ export default {
 </template>
 
 <style lang="scss" scoped>
-@import '@/assets/style.scss';
+@import './style.scss';
 
-.icon {
-  fill: $textColor;
-}
+.list-item-class {
+  align-items: center;
 
-.trash-icon {
-  fill: #c33;
+  button:first-child {
+    flex: 0 0 30px;
+  }
+
+  button:last-child {
+    flex: 0 0 auto;
+  }
 }
 
 .list-item.selected {
   button {
     font-weight: bold;
   }
-  svg.list-item-icon {
-    fill: #2ee838;
-  }
+}
+
+.class-methods {
+  margin-left: 30px;
+  margin-top: -5px;
+  margin-bottom: 5px;
 }
 
 select {

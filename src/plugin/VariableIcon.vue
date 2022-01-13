@@ -8,7 +8,7 @@ export default {
   ],
   computed: {
     classes () {
-      let ret = 'icon icon-type-' + this.type.replaceAll('/', '-')
+      let ret = 'icon icon-type-' + (this.type || '').replaceAll('/', '-')
       if (this.size) ret = ` size-${this.size}`
       if (this.isArray) ret += ' is-array'
       return ret

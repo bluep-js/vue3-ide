@@ -4,7 +4,7 @@ import VariableIcon from './VariableIcon.vue'
 export default {
   name: 'PanelVariableButton',
   components: { VariableIcon },
-  props: ['variable', 'types', 'icons', 'withCode'],
+  props: ['variable', 'types', 'icons', 'withCode', 'withAccess', 'withSource', 'noRemove', 'noClick'],
   emits: ['click', 'remove']
 }
 </script>
@@ -13,12 +13,14 @@ export default {
   <div
     class="variable"
   >
-    <button @click="$emit('click', variable.code)" class="icon-button variable-button">
+    <button :disabled="!!noClick" @click="$emit('click', variable.code)" class="icon-button variable-button">
       <div>
+        <span v-if="withAccess">[{{variable.access}}]</span>
         <VariableIcon
           :types="types"
           :type="variable.type"
           :isArray="variable.isArray"
+          :class="{ 'ml-5': !!withAccess }"
         />
         <span class="ml-5">{{variable.name}}</span>
         <span class="ml-5" v-if="!!withCode">
@@ -26,7 +28,10 @@ export default {
         </span>
       </div>
     </button>
-    <div>
+    <span v-if="!!withSource">
+      [{{variable.source.libraryName}}::{{variable.source.name}}]
+    </span>
+    <div v-if="!noRemove">
       <button @click="$emit('remove', variable.code)" class="icon-button">
         <i :class="icons.remove"></i>
       </button>
@@ -35,7 +40,7 @@ export default {
 </template>
 
 <style lang="scss" scoped>
-@import '@/assets/style.scss';
+@import './style.scss';
 .variable {
   display: flex;
   justify-content: space-between;

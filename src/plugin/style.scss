@@ -6,6 +6,7 @@ $textColor: #ddd;
 
 $nodeTypeExecute: #619298;
 $nodeTypeModifier: #69bd70;
+$panelHeaderBackground: #474f52;
 
 $panelWidth: 320px;
 $panelPadding: 4px;
@@ -29,8 +30,14 @@ $panelTextSize: 22px;
       display: flex;
       justify-content: space-between;
       border-bottom: 1px dashed $borderColor;
+      margin-top: $panelPadding;
       margin-bottom: $panelPadding;
       padding: $panelPadding;
+      background-color: $panelHeaderBackground;
+
+      &:first-child {
+        margin-top: 0;
+      }
     }
 
     .panel-body {
@@ -98,11 +105,8 @@ input.panel-input {
   font-size: $panelTextSize * 0.8;
   height: $panelTextSize !important;
   line-height: $panelTextSize !important;
-  // margin-left: 1rem;
   padding-left: $panelPadding;
-  width: auto;
-  position: relative;
-  top: 0;
+  width: 100%;
 
   &[type='checkbox'] {
     // width: $panelTextSize/1.4;
@@ -133,6 +137,25 @@ select.panel-input {
   }
 }
 
+.panel-row {
+  display: flex;
+
+  .panel-row-label {
+    flex: 0 0 math.div($panelWidth, 2);
+  }
+
+  .panel-row-widget {
+    flex: 1 1 auto;
+
+    .panel-input {
+      // width: 100%;
+    }
+  }
+}
+
+.t-left {
+  text-align: left;
+}
 .w-50 {
   width: 50%;
 }
@@ -141,15 +164,28 @@ select.panel-input {
   width: 100%;
 }
 
+.w-auto {
+  width: auto !important;
+}
+
 .d-flex {
   display: flex !important;
+}
+
+.d-flex-jcb {
+  display: flex !important;
+  justify-content: space-between;
 }
 
 .flex-row {
   display: flex;
   justify-content: space-between;
 }
+// margins
 // px
+.mr-5 {
+  margin-right: 5px;
+}
 .ml-5 {
   margin-left: 5px;
 }
@@ -172,6 +208,15 @@ select.panel-input {
 .ml-1r {
   margin-left: 1rem;
 }
+// paddings
+.pr-5p {
+  padding-right: 5px;
+}
+
+.px-5p {
+  padding-right: 5px;
+  padding-left: 5px;
+}
 
 .bg-white {
   background: #fff !important;
@@ -188,4 +233,8 @@ select.panel-input {
 .danger {
   border-color: red !important;
   color: red !important;
+}
+
+.no-wrap {
+  white-space: nowrap;
 }

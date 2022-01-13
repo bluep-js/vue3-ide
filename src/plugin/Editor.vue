@@ -10,8 +10,10 @@ import GraphVariablePanel from './GraphVariablePanel.vue'
 
 import EnumBuilder from './EnumBuilder.vue'
 import StructBuilder from './StructBuilder.vue'
+import ClassBuilder from './ClassBuilder.vue'
 
-import { jclone, waitFor } from '@/utils.js'
+import { jclone, waitFor } from './utils.js'
+// import { classCombined } from './graph.js'
 
 export default {
   name: 'BluepEditor',
@@ -23,6 +25,7 @@ export default {
     GraphVariablePanel,
     GraphVariablesPanel,
     StructBuilder,
+    ClassBuilder,
     EnumBuilder
   },
   props: {
@@ -67,19 +70,26 @@ export default {
           enum: 'fas fa-list-ol',
           struct: 'fab fa-delicious',
           function: 'fas fa-scroll',
-          class: '',
+          class: 'fas fa-file-code',
           library: 'fas fa-book',
           event: 'fas fa-bell',
+          chevronRight: 'fas fa-chevron-right',
+          chevronDown: 'fas fa-chevron-down',
           view: 'far fa-eye',
           add: 'fas fa-plus',
           remove: 'fas fa-trash',
+          edit: 'fas fa-pencil-alt',
           save: 'fas fa-save',
           run: 'fas fa-play',
           close: 'fas fa-times',
           fw: 'fa-fw'
         },
+        // dialogs: {
+        // prompt, alert, confirm
+        // },
         select: null,
-        defaultOnly: false
+        defaultOnly: false,
+        run: true
       })
     }
   },
@@ -95,7 +105,8 @@ export default {
       currentLibrary: null,
       selectedElement: null,
       selectedVariable: null,
-      firstLibs: true
+      firstLibs: true,
+      dialogs: {}
     }
   },
   created () {
@@ -113,13 +124,24 @@ export default {
         }
       }
     }
+    this.dialogs.alert = opts.dialogs && opts.dialogs.alert ? opts.dialogs.alert : (...args) => new Promise(resolve => {
+      const res = alert(...args)
+      resolve(res)
+    })
+    this.dialogs.prompt = opts.dialogs && opts.dialogs.prompt ? opts.dialogs.prompt : (...args) => new Promise(resolve => {
+      const res = prompt(...args)
+      resolve(res)
+    })
+    this.dialogs.confirm = opts.dialogs && opts.dialogs.confirm ? opts.dialogs.confirm : (...args) => new Promise(resolve => {
+      const res = confirm(...args)
+      resolve(res)
+    })
     if (lib) {
       this.currentLibrary = lib
     }
     if (el) {
       this.selectedElement = el
     }
-
   },
   watch: {
     libraries: {
@@ -166,44 +188,47 @@ export default {
     */
     nodesFull () {
       const ret = [...this.nodes]
-      const variableGet = this.nodes.find(node => node.code === 'variable/get')
-      const variableSet = this.nodes.find(node => node.code === 'variable/set')
-      // get nodes
-      let paths = ['inputs', 'variables']
-      paths.forEach(path => {
-        Object.values(this.libs[this.selectedElement.library].functions[this.selectedElement.code].context[path]).forEach(slot => {
-          const node = jclone(variableGet)
-          node.addable = true
-          node.name = `Get ${slot.name}`
-          node.code += '/' + slot.code
-          node.data = {
-            context: path,
-            code: slot.code,
-            name: slot.name,
-            type: slot.type
-          }
-          node.outputs[slot.code] = jclone(slot)
-          ret.push(node)
+      // current function variables
+      if (this.libs[this.selectedElement.library].functions[this.selectedElement.code]) {
+        const variableGet = this.nodes.find(node => node.code === 'variable/get')
+        const variableSet = this.nodes.find(node => node.code === 'variable/set')
+        // get nodes
+        let paths = ['inputs', 'variables']
+        paths.forEach(path => {
+          Object.values(this.libs[this.selectedElement.library].functions[this.selectedElement.code].context[path]).forEach(slot => {
+            const node = jclone(variableGet)
+            node.addable = true
+            node.name = `Get ${slot.name}`
+            node.code += '/' + slot.code
+            node.data = {
+              context: path,
+              code: slot.code,
+              name: slot.name,
+              type: slot.type
+            }
+            node.outputs[slot.code] = jclone(slot)
+            ret.push(node)
+          })
         })
-      })
-      // set nodes
-      paths = ['outputs', 'variables']
-      paths.forEach(path => {
-        Object.values(this.libs[this.selectedElement.library].functions[this.selectedElement.code].context[path]).forEach(slot => {
-          const node = jclone(variableSet)
-          node.addable = true
-          node.name = `Set ${slot.name}`
-          node.code += '/' + slot.code
-          node.data = {
-            context: path,
-            code: slot.code,
-            name: slot.name,
-            type: slot.type
-          }
-          node.inputs[slot.code] = jclone(slot)
-          ret.push(node)
+        // set nodes
+        paths = ['outputs', 'variables']
+        paths.forEach(path => {
+          Object.values(this.libs[this.selectedElement.library].functions[this.selectedElement.code].context[path]).forEach(slot => {
+            const node = jclone(variableSet)
+            node.addable = true
+            node.name = `Set ${slot.name}`
+            node.code += '/' + slot.code
+            node.data = {
+              context: path,
+              code: slot.code,
+              name: slot.name,
+              type: slot.type
+            }
+            node.inputs[slot.code] = jclone(slot)
+            ret.push(node)
+          })
         })
-      })
+      }
       // functions nodes
       const graphFunction = this.nodes.find(node => node.code === 'graph/function')
       Object.keys(this.libs[this.currentLibrary].functions).forEach(fid => {
@@ -249,7 +274,33 @@ export default {
           })
           ret.push(node)
         })
+
+        // modules enums
+        Object.values(this.modules || {}).forEach(m => {
+          Object.keys(m.enums || {}).forEach(eid => {
+            const enm = m.enums[eid]
+            const node = jclone(enumFunction)
+            node.addable = true
+            node.code += `/${eid}`
+            node.data = jclone(enm)
+            node.name = `"${enm.name}" ${node.name}`
+            Object.keys(node.inputs).forEach(slot => {
+              // node.inputs[slot] = jclone(fn.context.inputs[slot])
+              if (node.inputs[slot].type.startsWith('bluep/enum')) {
+                node.inputs[slot].type += `/${eid}`
+              }
+            })
+            Object.keys(node.outputs).forEach(slot => {
+              // node.outputs[slot] = jclone(fn.context.outputs[slot])
+              if (node.outputs[slot].type.startsWith('bluep/enum')) {
+                node.outputs[slot].type += `/${eid}`
+              }
+            })
+            ret.push(node)
+          })
+        })
       })
+
       // struct functions
       const structPackFunction = this.nodes.find(node => node.code === 'struct/pack')
       const structUnpackFunction = this.nodes.find(node => node.code === 'struct/unpack')
@@ -298,19 +349,243 @@ export default {
         ret.push(nodeFromObject)
       })
 
+      // modules structs
+      Object.values(this.modules || {}).forEach(m => {
+        Object.keys(m.structs || {}).forEach(sid => {
+          const sct = m.structs[sid]
+
+          const nodePack = jclone(structPackFunction)
+          nodePack.addable = true
+          nodePack.code += `/${sid}`
+          nodePack.data = jclone(sct)
+          nodePack.name = sct.name
+          Object.keys(sct.schema).forEach(field => {
+            nodePack.inputs[field] = jclone(sct.schema[field])
+          })
+          nodePack.outputs.struct.type += `/${sct.code}`
+          ret.push(nodePack)
+
+          const nodeUnpack = jclone(structUnpackFunction)
+          nodeUnpack.addable = true
+          nodeUnpack.code += `/${sid}`
+          nodeUnpack.data = jclone(sct)
+          nodeUnpack.name = sct.name
+          Object.keys(sct.schema).forEach(field => {
+            nodeUnpack.outputs[field] = jclone(sct.schema[field])
+          })
+          nodeUnpack.inputs.struct.type += `/${sct.code}`
+          ret.push(nodeUnpack)
+
+          const nodeToObject = jclone(structToObjectFunction)
+          nodeToObject.addable = true
+          nodeToObject.code += `/${sid}`
+          nodeToObject.data = jclone(sct)
+          nodeToObject.name = sct.name
+          nodeToObject.inputs.struct.type += `/${sct.code}`
+          ret.push(nodeToObject)
+
+          const nodeFromObject = jclone(structFromObjectFunction)
+          nodeFromObject.addable = true
+          nodeFromObject.code += `/${sid}`
+          nodeFromObject.data = jclone(sct)
+          nodeFromObject.name = sct.name
+          nodeFromObject.outputs.struct.type += `/${sct.code}`
+          ret.push(nodeFromObject)
+        })
+      })
+
+      // CLASSES
+      const sec = this.selectedElement ? this.selectedElement.class : null
+      if (sec) {
+        const classThis = this.nodes.find(node => node.code === 'class/this')
+        const node = jclone(classThis)
+        node.addable = true
+        node.code += `/${sec}`
+        node.data = {
+          class: sec
+        }
+        node.outputs.object.type += `/${sec}`
+        // console.log('this', node)
+        ret.push(node)
+      }
+      Object.keys(this.libraries[this.currentLibrary].classes || {}).forEach(clsCode => {
+        // const cls = classCombined(clsCode, this.currentLibrary, this.libraries, this.modules)
+        const cls = this.libraries[this.currentLibrary].classes[clsCode]
+        // console.log(sec, 'cls', cls)
+        /**/
+        const classVariableGet = this.nodes.find(node => node.code === 'class/get')
+        const classVariableSet = this.nodes.find(node => node.code === 'class/set')
+        Object.values(cls.schema || {}).forEach(prop => {
+          // console.log('prop', cls.name, prop, cls.code, sec)
+          if (prop.access !== 'public' && cls.code !== sec) return
+          const node = jclone(classVariableGet)
+          node.addable = true
+          node.name = `${cls.name}::${prop.name}`
+          node.code += `/${cls.code}/${prop.code}`
+          node.data = {
+            context: 'schema',
+            code: prop.code,
+            class: cls.code
+          }
+          node.outputs[prop.code] = jclone(prop)
+          node.inputs.object.type += `/${cls.code}`
+          ret.push(node)
+
+          const node2 = jclone(classVariableSet)
+          node2.addable = true
+          node2.name = `Set ${cls.name}::${prop.name}`
+          node2.code += `/${cls.code}/${prop.code}`
+          node2.data = {
+            context: 'schema',
+            code: prop.code,
+            class: cls.code
+          }
+          node2.inputs[prop.code] = jclone(prop)
+          node2.inputs.object.type += `/${cls.code}`
+          ret.push(node2)
+        })
+        /**/
+        const classMethod = this.nodes.find(node => node.code === 'class/method')
+        Object.values(cls.methods || {}).forEach(mth => {
+          if (mth.access !== 'public' && cls.code !== sec) return
+          if (mth.type === 'method') {
+            const node = jclone(classMethod)
+            node.addable = true
+            node.name = `${cls.name}::${mth.name}`
+            node.code += `/${cls.code}/${mth.code}`
+            node.data = {
+              context: 'schema',
+              code: mth.code,
+              class: cls.code,
+              library: cls.library
+            }
+            Object.keys(mth.context.inputs || {}).forEach(fcode => {
+              node.inputs[fcode] = jclone(mth.context.inputs[fcode])
+            })
+            Object.keys(mth.context.outputs || {}).forEach(fcode => {
+              node.outputs[fcode] = jclone(mth.context.outputs[fcode])
+            })
+            node.inputs.object.type += `/${cls.code}`
+            ret.push(node)
+          }
+        })
+      })
+      /*
+      if (this.selectedElement && (this.selectedElement.type === 'constructor' || this.selectedElement.type === 'method')) {
+        // const cls = classCombined(this.selectedElement
+        // class variables
+        const classVariableGet = this.nodes.find(node => node.code === 'class/get')
+        const classVariableSet = this.nodes.find(node => node.code === 'class/set')
+        // get nodes
+        let paths = ['inputs', 'variables']
+        paths.forEach(path => {
+          Object.values(this.libs[this.selectedElement.library].functions[this.selectedElement.code].context[path]).forEach(slot => {
+            const node = jclone(variableGet)
+            node.addable = true
+            node.name = `Get ${slot.name}`
+            node.code += '/' + slot.code
+            node.data = {
+              context: path,
+              code: slot.code,
+              name: slot.name,
+              type: slot.type
+            }
+            node.outputs[slot.code] = jclone(slot)
+            ret.push(node)
+          })
+        })
+        // set nodes
+        paths = ['outputs', 'variables']
+        paths.forEach(path => {
+          Object.values(this.libs[this.selectedElement.library].functions[this.selectedElement.code].context[path]).forEach(slot => {
+            const node = jclone(variableSet)
+            node.addable = true
+            node.name = `Set ${slot.name}`
+            node.code += '/' + slot.code
+            node.data = {
+              context: path,
+              code: slot.code,
+              name: slot.name,
+              type: slot.type
+            }
+            node.inputs[slot.code] = jclone(slot)
+            ret.push(node)
+          })
+        })
+      }
+      /**/
+
+      // Actors
+      const actorGet = this.nodes.find(node => node.code === 'actor/get')
+      const actorMethod = this.nodes.find(node => node.code === 'actor/method')
+      const actorState = this.nodes.find(node => node.code === 'actor/state')
+      const doneActors = {}
+      Object.values(this.actors).forEach(actor => {
+        if (doneActors[actor.code]) return
+        const getNode = jclone(actorGet)
+        getNode.addable = true
+        getNode.name = actor.name
+        getNode.code += '/' + actor.code
+        getNode.outputs.actor.name = actor.name
+        getNode.outputs.actor.type += '/' + actor.code
+        getNode.data = { actor: actor.id }
+        ret.push(getNode)
+
+        const stateNode = jclone(actorState)
+        stateNode.addable = true
+        stateNode.name = actor.name
+        stateNode.code += '/' + actor.code
+        stateNode.inputs.actor.name = actor.name
+        stateNode.inputs.actor.type += '/' + actor.code
+        stateNode.data = { actor: actor.id }
+        Object.keys(actor.state).forEach(field => {
+          stateNode.outputs[field] = jclone(actor.state[field])
+        })
+        ret.push(stateNode)
+
+        Object.values(actor.methods).forEach(method => {
+          const mNode = jclone(actorMethod)
+          mNode.addable = true
+          mNode.code += `/${actor.id}/method/${method.code}`
+          mNode.name = actor.name + ' :: ' + method.name + '()'
+          mNode.data = {
+            actor: actor.id,
+            method: method.code
+          }
+          mNode.inputs.actor.name = actor.name
+          mNode.inputs.actor.type += `/${actor.code}`
+          Object.keys(method.inputs || {}).forEach(field => {
+            mNode.inputs[field] = JSON.parse(JSON.stringify(method.inputs[field]))
+          })
+          Object.keys(method.outputs || {}).forEach(field => {
+            mNode.outputs[field] = JSON.parse(JSON.stringify(method.outputs[field]))
+          })
+          ret.push(mNode)
+        })
+
+        doneActors[actor.code] = true
+      })
+
+      return ret
+
+      /*
       let base = [...ret]
       Object.values(this.modules || {}).forEach(m => {
         if (!m.ide || !m.ide.nodes) {
           return
         }
         let nodesFn = null
-        try {
-          // eslint-disable-next-line
-          nodesFn = eval(m.ide.nodes)
-        } catch (err) {
-          // eslint-disable-next-line
-          console.error('eval failed', err)
-          nodesFn = null
+        if (typeof m.ide.nodes === 'function') {
+          nodesFn = m.ide.nodes
+        } else {
+          try {
+            // eslint-disable-next-line
+            nodesFn = eval(m.ide.nodes)
+          } catch (err) {
+            // eslint-disable-next-line
+            console.error('eval failed', err)
+            nodesFn = null
+          }
         }
         if (typeof nodesFn !== 'function') {
           return
@@ -320,13 +595,14 @@ export default {
           base = [...base, ...ml]
         }
       })
-
       return base
+      */
     },
     /**
       full list of types includes
         basic/* types
         enums types
+        classes types
         modules types
     */
     typesFull () {
@@ -356,30 +632,46 @@ export default {
           tp.name = `Struct: ${enm.name}`
           ret[tp.code] = tp
         })
+      Object.values(this.libs[this.currentLibrary].classes || {})
+        .forEach(enm => {
+          const tp = jclone(this.types['bluep/class'])
+          tp.code += `/${enm.code}`
+          tp.name = `Class: ${enm.name}`
+          ret[tp.code] = tp
+        })
+      // actors as classes types
+      Object.values(this.actors)
+        .forEach(actor => {
+          const tp = jclone(this.types['bluep/class'])
+          tp.code += `/${actor.code}`
+          tp.name = `Actor: ${actor.name}`
+          ret[tp.code] = tp
+        })
 
+      // modules types
       let base = { ...ret }
       Object.values(this.modules).forEach(m => {
-        if (!m.ide || !m.ide.types) {
-          return
-        }
-        let fn = null
-        try {
-          // eslint-disable-next-line
-          fn = eval(m.ide.types)
-        } catch (err) {
-          // eslint-disable-next-line
-          console.error('eval failed', err)
-          fn = null
-        }
-        if (typeof fn !== 'function') {
-          return
-        }
-        const ml = fn(this.libraries, this.currentLibrary, this.actors, this.types)
-        if (Array.isArray(ml)) {
-          base = [...base, ...ml]
-        }
+        // module enums
+        Object.values(m.enums || {})
+          .forEach(enm => {
+            const tp = jclone(this.types['bluep/enum'])
+            tp.code += `/${enm.code}`
+            tp.name = `Enum: ${enm.name}`
+            ret[tp.code] = tp
+          })
+        // module structs
+        Object.values(m.structs || {})
+          .forEach(enm => {
+            const tp = jclone(this.types['bluep/struct'])
+            tp.code += `/${enm.code}`
+            tp.name = `Struct: ${enm.name}`
+            ret[tp.code] = tp
+          })
+        // module defined types
+        // to override automated color
+        const tps = jclone(m.types || {})
+        base = { ...base, ...tps }
       })
-
       return base
     }
   },
@@ -443,8 +735,9 @@ export default {
     /**
       Emits 'save' event on save click
     */
-    saveClick () {
-      if (!confirm('Save any changes?')) return
+    async saveClick () {
+      const ok = await this.dialogs.confirm('Save Libraries?')
+      if (!ok) return
       this.$emit('save', this.libs)
       this.isSaved = true
     },
@@ -511,24 +804,19 @@ export default {
           console.error('no nodes!')
           return
         }
-        const callNode = JSON.parse(JSON.stringify(graphCall))
+        const callNode = jclone(graphCall)
         const now = new Date()
         callNode.id = `${callNode.code}_${now.getTime()}`
-        data.graph.nodes[callNode.id] = callNode
-        data.layout.parts[callNode.id] = {
-          x: 1010,
-          y: 1010
-        }
-        data.entry = callNode.id
         // module event
         if (info.type === 'event' && info.module && this.modules[info.module]) {
           const eventCode = info.code
           const eventInfo = this.modules[info.module].events[eventCode]
           data.event = { ...info, config: {}, info: jclone(eventInfo) }
           data.name = eventInfo.name
-          // console.log('ev?', data.event)
           Object.keys(eventInfo.outputs || {}).forEach(key => {
-            data.graph.nodes[callNode.id].outputs[key] = jclone(eventInfo.outputs[key])
+            const f = jclone(eventInfo.outputs[key])
+            data.context.inputs[key] = f
+            callNode.outputs[key] = f
           })
         }
         // actor event
@@ -537,15 +825,23 @@ export default {
           const eventInfo = this.actors[info.actor].events[eventCode]
           data.event = { ...info, info: jclone(eventInfo) }
           data.name = this.actors[info.actor].name + ' ' + eventInfo.name
-          // console.log('ev?', data.event)
           Object.keys(eventInfo.outputs || {}).forEach(key => {
-            data.graph.nodes[callNode.id].outputs[key] = jclone(eventInfo.outputs[key])
+            const f = jclone(eventInfo.outputs[key])
+            data.context.inputs[key] = f
+            callNode.outputs[key] = f
           })
         }
         /**/
         if (!this.libs[this.currentLibrary].functions) {
           this.libs[this.currentLibrary].functions = {}
         }
+        data.graph.nodes[callNode.id] = jclone(callNode)
+        data.layout.parts[callNode.id] = {
+          x: 1010,
+          y: 1010
+        }
+        data.entry = callNode.id
+        // console.log('new', callNode)
         this.libs[this.currentLibrary].functions[code] = data
         this.isSaved = false
         this.selectedElement = this.libs[this.currentLibrary].functions[code]
@@ -597,6 +893,31 @@ export default {
           code
         })
       }
+      // new class
+      if (info.type === 'class') {
+        const code = uuid()
+        if (!this.libs[this.currentLibrary].classes) {
+          this.libs[this.currentLibrary].classes = {}
+        }
+        this.libs[this.currentLibrary].classes[code] = {
+          code,
+          name: info.name,
+          type: 'class',
+          library: this.currentLibrary,
+          extends: {},
+          // class properties
+          schema: {},
+          // class methods
+          methods: {}
+        }
+        this.isSaved = false
+        this.selectedElement = this.libs[this.currentLibrary].classes[code]
+        this.$emit('select', {
+          type: 'class',
+          library: this.currentLibrary,
+          code
+        })
+      }
     },
     /**
       Select library element
@@ -619,6 +940,10 @@ export default {
         this.selectedElement = null
         this.$emit('select', null)
       }
+      if (el.type === 'class') {
+        delete this.libs[el.library].classes[el.code]
+        this.isSaved = false
+      }
       if (el.type === 'function') {
         delete this.libs[el.library].functions[el.code]
         this.isSaved = false
@@ -633,6 +958,11 @@ export default {
       }
     },
 
+    // =============================================
+
+    //                    FUNCTIONS
+
+    // =============================================
     /**
       Deletes function edge
     */
@@ -761,11 +1091,173 @@ export default {
       this.isSaved = false
     },
     /**
-      Update selected function cron option
+      Update selected function config
     */
     updateSelectedFunctionConfig (next) {
       this.libs[this.selectedElement.library].functions[this.selectedElement.code].event.config = next
       this.isSaved = false
+    },
+
+    // =============================================
+
+    //                    CLASSES
+
+    // =============================================
+    /**
+      Updates class manually
+    */
+    async updateSelectedClass (next) {
+      this.libs[this.selectedElement.library].classes[this.selectedElement.code] = next
+      await waitFor(0)
+      this.isSaved = false
+    },
+
+    /**
+      Deletes class function edge
+    */
+    deleteClassFunctionEdge (eid) {
+      if (!this.selectedElement || !(this.selectedElement.type === 'constructor' || this.selectedElement.type === 'method')) return
+      const edge = this.libs[this.selectedElement.library].classes[this.selectedElement.class].methods[this.selectedElement.code].graph.edges[eid]
+      console.log('dcfe', edge)
+      if (!edge) return
+      if (this.libs[this.selectedElement.library].classes[this.selectedElement.class].methods[this.selectedElement.code].graph.nodes[edge.from.node].outputs[edge.from.slot].connections) delete this.libs[this.selectedElement.library].classes[this.selectedElement.class].methods[this.selectedElement.code].graph.nodes[edge.from.node].outputs[edge.from.slot].connections[eid]
+      if (this.libs[this.selectedElement.library].classes[this.selectedElement.class].methods[this.selectedElement.code].graph.nodes[edge.to.node].inputs[edge.to.slot].connections) delete this.libs[this.selectedElement.library].classes[this.selectedElement.class].methods[this.selectedElement.code].graph.nodes[edge.to.node].inputs[edge.to.slot].connections[eid]
+      delete this.libs[this.selectedElement.library].classes[this.selectedElement.class].methods[this.selectedElement.code].graph.edges[eid]
+      delete this.libs[this.selectedElement.library].classes[this.selectedElement.class].methods[this.selectedElement.code].layout.parts[eid]
+    },
+
+    /**
+      Add function variable and select it
+    */
+    addClassFunctionVariable (path) {
+      // console.log('add cfv', path)
+      /**/
+      if (!this.selectedElement || !(this.selectedElement.type !== 'constructor' || this.selectedElement.type === 'method')) return
+      const vid = uuid()
+      const varn = Object.keys(this.libs[this.selectedElement.library].classes[this.selectedElement.class].methods[this.selectedElement.code].context[path]).length
+      const slot = {
+        code: vid,
+        name: `${path} ${varn}`,
+        type: 'basic/boolean'
+      }
+      this.libs[this.selectedElement.library].classes[this.selectedElement.class].methods[this.selectedElement.code].context[path][vid] = slot
+      Object.keys(this.libs[this.selectedElement.library].classes[this.selectedElement.class].methods[this.selectedElement.code].graph.nodes).forEach(nid => {
+        const node = this.libs[this.selectedElement.library].classes[this.selectedElement.class].methods[this.selectedElement.code].graph.nodes[nid]
+        if (node.code === 'graph/call' && path === 'inputs') {
+          node.outputs[slot.code] = jclone(slot)
+        }
+        if (node.code === 'graph/return' && path === 'outputs') {
+          node.inputs[slot.code] = jclone(slot)
+        }
+      })
+      this.selectedVariable = {
+        variable: this.libs[this.selectedElement.library].classes[this.selectedElement.class].methods[this.selectedElement.code].context[path][vid],
+        context: path
+      }
+      this.isSaved = false
+      /**/
+    },
+    /**
+      Edit function variable
+    */
+    editClassFunctionVariable (info) {
+      // console.log('select cfv', info)
+      if (!this.selectedElement || !(this.selectedElement.type === 'constructor' || this.selectedElement.type === 'method')) return
+      this.selectedVariable = {
+        variable: this.libs[this.selectedElement.library].classes[this.selectedElement.class].methods[this.selectedElement.code].context[info.path][info.code],
+        context: info.path
+      }
+      console.log('select cfv', this.selectedVariable)
+    },
+    /**
+      Remove function variable
+    */
+    removeClassFunctionVariable (info) {
+      // console.log('remove cfv', info)
+      /**/
+      // if (!this.selectedElement || this.selectedElement.type !== 'function') return
+      if (!this.selectedElement || !(this.selectedElement.type === 'constructor' || this.selectedElement.type === 'method')) return
+      if (this.selectedVariable && info.path === this.selectedVariable.context && info.code === this.selectedVariable.variable.code) this.deselectClassFunctionVariable()
+      delete this.libs[this.selectedElement.library].classes[this.selectedElement.class].methods[this.selectedElement.code].context[info.path][info.code]
+      Object.keys(this.libs[this.selectedElement.library].classes[this.selectedElement.class].methods[this.selectedElement.code].graph.nodes).forEach(nid => {
+        const node = this.libs[this.selectedElement.library].classes[this.selectedElement.class].methods[this.selectedElement.code].graph.nodes[nid]
+        if (node.code === 'graph/call' && info.path === 'inputs') {
+          Object.keys(node.outputs[info.code].connections || {}).forEach(eid => this.deleteClassFunctionEdge(eid))
+          delete node.outputs[info.code]
+        }
+        if (node.code === 'graph/return' && info.path === 'outputs') {
+          Object.keys(node.inputs[info.code].connections || {}).forEach(eid => this.deleteClassFunctionEdge(eid))
+          delete node.inputs[info.code]
+        }
+      })
+      this.isSaved = false
+      /**/
+    },
+    /**
+      Deselect function variable
+    */
+    deselectClassFunctionVariable () {
+      this.selectedVariable = null
+    },
+    /**
+      Changes selected function variable
+    */
+    selectedClassFunctionVariableChanged (data) {
+      console.log('changed cfv', data)
+      /**/
+      this.libs[this.selectedElement.library].classes[this.selectedElement.class].methods[this.selectedElement.code].context[this.selectedVariable.context][this.selectedVariable.variable.code] = {
+        ...jclone(this.selectedVariable.variable),
+        ...jclone(data)
+      }
+      Object.keys(this.libs[this.selectedElement.library].classes[this.selectedElement.class].methods[this.selectedElement.code].graph.nodes).forEach(nid => {
+        const node = this.libs[this.selectedElement.library].classes[this.selectedElement.class].methods[this.selectedElement.code].graph.nodes[nid]
+        // inputs call nodes
+        if (node.code === 'graph/call' && this.selectedVariable.context === 'inputs') {
+          const next = {
+            ...jclone(node.outputs[this.selectedVariable.variable.code]),
+            ...jclone(this.selectedVariable.variable)
+          }
+          node.outputs[this.selectedVariable.variable.code] = next
+        }
+        // outputs call nodes
+        if (node.code === 'graph/return' && this.selectedVariable.context === 'outputs') {
+          const next = {
+            ...jclone(node.inputs[this.selectedVariable.variable.code]),
+            ...jclone(this.selectedVariable.variable)
+          }
+          node.inputs[this.selectedVariable.variable.code] = next
+        }
+      })
+      this.isSaved = false
+      /**/
+    },
+    /**
+      Changes selected function variable type
+    */
+    selectedClassFunctionVariableTypeChanged () {
+      console.log('type changed cfv')
+      /**/
+      Object.keys(this.libs[this.selectedElement.library].classes[this.selectedElement.class].methods[this.selectedElement.code].graph.nodes).forEach(nid => {
+        const node = this.libs[this.selectedElement.library].classes[this.selectedElement.class].methods[this.selectedElement.code].graph.nodes[nid]
+        if (node.code === 'graph/call' && this.selectedVariable.context === 'inputs') {
+          Object.keys(node.outputs[this.selectedVariable.variable.code].connections || {}).forEach(eid => this.deleteClassFunctionEdge(eid))
+        }
+        if (node.code === 'graph/return' && this.selectedVariable.context === 'outputs') {
+          Object.keys(node.inputs[this.selectedVariable.variable.code].connections || {}).forEach(eid => this.deleteClassFunctionEdge(eid))
+        }
+      })
+      this.isSaved = false
+      /**/
+    },
+    /**
+      Update selected function name
+    */
+    updateSelectedClassFunctionName (next) {
+      console.log('update cfv', next)
+      /**/
+      this.libs[this.selectedElement.library].classes[this.selectedElement.class].methods[this.selectedElement.code].name = next
+      this.isSaved = false
+      /**/
     }
   }
 }
@@ -782,6 +1274,7 @@ export default {
       :selectedElement="selectedElement"
       :isSaved="isSaved"
       :icons="options.icons"
+      :canRun="options.canRun"
       @selectLibrary="selectLibrary"
       @createLibrary="createLibrary"
       @viewLibrary="viewCurrentLibrary"
@@ -814,6 +1307,18 @@ export default {
         @updateName="updateSelectedFunctionName"
         @updateConfig="updateSelectedFunctionConfig"
       />
+      <GraphVariablesPanel
+        v-if="selectedElement?.type === 'method' || selectedElement?.type === 'constructor'"
+        :fn="selectedElement"
+        :cls="libraries[selectedElement.library].classes[selectedElement.class]"
+        :isMethod="true"
+        :types="typesFull"
+        :icons="options.icons"
+        @addVariable="addClassFunctionVariable"
+        @editVariable="editClassFunctionVariable"
+        @deleteVariable="removeClassFunctionVariable"
+        @updateName="updateSelectedClassFunctionName"
+      />
     </div>
     <div class="paper-area">
       <LibraryProperties
@@ -833,6 +1338,16 @@ export default {
         v-model="selectedElement"
         @update:modelValue="libs[selectedElement.library].functions[selectedElement.code] = $event; isSaved = false"
       />
+      <GraphBuilder
+        :libraries="libs"
+        :types="typesFull"
+        :nodes="nodesFull"
+        :currentLibrary="currentLibrary"
+        :icons="options.icons"
+        v-if="selectedElement?.type === 'method' || selectedElement?.type === 'constructor'"
+        v-model="selectedElement"
+        @update:modelValue="libs[selectedElement.library].classes[selectedElement.class].methods[selectedElement.code] = $event; isSaved = false"
+      />
       <EnumBuilder
         :libraries="libs"
         :types="typesFull"
@@ -851,6 +1366,18 @@ export default {
         v-model="selectedElement"
         @update:modelValue="libs[selectedElement.library].structs[selectedElement.code] = $event; isSaved = false"
       />
+      <ClassBuilder
+        :libraries="libs"
+        :modules="modules"
+        :nodes="nodes"
+        :dialogs="dialogs"
+        :types="typesFull"
+        :currentLibrary="currentLibrary"
+        :icons="options.icons"
+        v-if="selectedElement?.type === 'class'"
+        v-model="selectedElement"
+        @update:modelValue="updateSelectedClass"
+      />
       <!--
         v-model="selectedElement"
         v-model="libs[selectedElement.library].functions[selectedElement.code]"
@@ -861,7 +1388,7 @@ export default {
     </div>
     <div v-if="selectedVariable" class="right-bar">
       <GraphVariablePanel
-        v-if="selectedVariable"
+        v-if="selectedVariable && selectedElement.type === 'function'"
         :libraries="libs"
         :currentLibrary="currentLibrary"
         :variable="selectedVariable.variable"
@@ -873,13 +1400,26 @@ export default {
         @variableUpdated="selectedFunctionVariableChanged"
         @typeChanged="selectedFunctionVariableTypeChanged"
       />
+      <GraphVariablePanel
+        v-if="selectedVariable && (selectedElement.type === 'method' || selectedElement.type === 'constructor')"
+        :libraries="libs"
+        :currentLibrary="currentLibrary"
+        :variable="selectedVariable.variable"
+        :context="libs[selectedElement.library].classes[selectedElement.class].methods[selectedElement.code].context"
+        :types="typesFull"
+        :direction="selectedVariable.context"
+        :icons="options.icons"
+        @closeMe="deselectClassFunctionVariable"
+        @variableUpdated="selectedClassFunctionVariableChanged"
+        @typeChanged="selectedClassFunctionVariableTypeChanged"
+      />
     </div>
   </div>
 </div>
 </template>
 
 <style lang="scss" scoped>
-@import '@/assets/style.scss';
+@import './style.scss';
 
 .editor {
   background-color: $bgColor;

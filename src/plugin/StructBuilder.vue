@@ -1,5 +1,5 @@
 <script>
-import { jclone } from '@/utils.js'
+import { jclone } from './utils.js'
 import VariableButton from './PanelVariableButton.vue'
 import VariablePanel from './GraphVariablePanel.vue'
 
@@ -29,7 +29,7 @@ export default {
     addValue () {
       const code = prompt('Enter field code')
       if (!code || !code.length || this.structData.schema[code]) {
-        if (code && this.sctructData.schema[code]) {
+        if (code && this.structData.schema[code]) {
           alert('Already exists')
         }
         return
@@ -102,16 +102,24 @@ export default {
           Struct properties
         </div>
         <div class="panel-body">
-          <div class="mt-2r mb-2">
-            <label>Code</label>
-            <input class="bg-white" type="text" disabled v-model="structData.code"/>
+          <div class="mt-2r mb-2 panel-row">
+            <div class="panel-row-label">
+              <label>Code</label>
+            </div>
+            <div class="panel-row-widget">
+              <input class="text-dark panel-input" type="text" disabled v-model="structData.code"/>
+            </div>
           </div>
-          <div class="mb-2r">
-            <label>Name</label>
-            <input class="bg-white" type="text" v-model="structData.name" @update:modelValue="saved = false"/>
-            <blockquote v-if="nameError" class="danger">
-              <i>Exists or empty</i>
-            </blockquote>
+          <div class="mb-2r panel-row">
+            <div class="panel-row-label">
+              <label>Name</label>
+            </div>
+            <div class="panel-row-widget">
+              <input class="text-dark panel-input" type="text" v-model="structData.name" @update:modelValue="saved = false"/>
+              <blockquote v-if="nameError" class="danger">
+                <i>Exists or empty</i>
+              </blockquote>
+            </div>
           </div>
         </div>
         <div class="panel-header">
@@ -161,7 +169,7 @@ export default {
 </template>
 
 <style lang="scss" scoped>
-@import '@/assets/style.scss';
+@import './style.scss';
 
 .wrapper {
   display: flex;
