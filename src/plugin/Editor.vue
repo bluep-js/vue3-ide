@@ -405,7 +405,7 @@ export default {
           class: sec
         }
         node.outputs.object.type += `/${sec}`
-        console.log('this', node)
+        // console.log('this', node)
         ret.push(node)
       }
       Object.keys(this.libraries[this.currentLibrary].classes || {}).forEach(clsCode => {
@@ -841,7 +841,7 @@ export default {
           y: 1010
         }
         data.entry = callNode.id
-        console.log('new', callNode)
+        // console.log('new', callNode)
         this.libs[this.currentLibrary].functions[code] = data
         this.isSaved = false
         this.selectedElement = this.libs[this.currentLibrary].functions[code]

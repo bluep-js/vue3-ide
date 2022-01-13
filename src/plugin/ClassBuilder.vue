@@ -169,7 +169,7 @@ export default {
       // console.log('select inout', inf)
       this.selectedFnInout = inf
     },
-    updateFnInout (inf) {
+    updateFnInout (/*inf*/) {
       /*
       // Object.keys(
       const sel = this.selectedFnInout

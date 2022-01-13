@@ -48,7 +48,7 @@ export default {
   watch: {
     'node.inputs.of': {
       deep: true,
-      handler (next, prev) {
+      handler (next/*, prev*/) {
         // console.log('next of', next, prev)
         // if (next && prev && next.value === prev.value) return
         Object.keys(this.node.inputs).forEach(incode => {
