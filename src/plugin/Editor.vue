@@ -15,6 +15,25 @@ import ClassBuilder from './ClassBuilder.vue'
 import { jclone, waitFor } from './utils.js'
 // import { classCombined } from './graph.js'
 
+const defaultIcons = {
+  enum: 'fas fa-list-ol',
+  struct: 'fab fa-delicious',
+  function: 'fas fa-scroll',
+  class: 'fas fa-file-code',
+  library: 'fas fa-book',
+  event: 'fas fa-bell',
+  chevronRight: 'fas fa-chevron-right',
+  chevronDown: 'fas fa-chevron-down',
+  view: 'far fa-eye',
+  add: 'fas fa-plus',
+  remove: 'fas fa-trash',
+  edit: 'fas fa-pencil-alt',
+  save: 'fas fa-save',
+  run: 'fas fa-play',
+  close: 'fas fa-times',
+  fw: 'fa-fw'
+}
+
 export default {
   name: 'BluepEditor',
   components: {
@@ -66,24 +85,7 @@ export default {
     options: {
       type: Object,
       default: () => ({
-        icons: {
-          enum: 'fas fa-list-ol',
-          struct: 'fab fa-delicious',
-          function: 'fas fa-scroll',
-          class: 'fas fa-file-code',
-          library: 'fas fa-book',
-          event: 'fas fa-bell',
-          chevronRight: 'fas fa-chevron-right',
-          chevronDown: 'fas fa-chevron-down',
-          view: 'far fa-eye',
-          add: 'fas fa-plus',
-          remove: 'fas fa-trash',
-          edit: 'fas fa-pencil-alt',
-          save: 'fas fa-save',
-          run: 'fas fa-play',
-          close: 'fas fa-times',
-          fw: 'fa-fw'
-        },
+        icons: defaultIcons,
         // dialogs: {
         // prompt, alert, confirm
         // },
@@ -111,6 +113,7 @@ export default {
   },
   created () {
     const opts = this.options
+    opts.icons = { ...defaultIcons, ...(opts.icons || {}) }
     let lib = null
     let el = null
     if (opts && opts.select) {
@@ -1118,7 +1121,6 @@ export default {
     deleteClassFunctionEdge (eid) {
       if (!this.selectedElement || !(this.selectedElement.type === 'constructor' || this.selectedElement.type === 'method')) return
       const edge = this.libs[this.selectedElement.library].classes[this.selectedElement.class].methods[this.selectedElement.code].graph.edges[eid]
-      console.log('dcfe', edge)
       if (!edge) return
       if (this.libs[this.selectedElement.library].classes[this.selectedElement.class].methods[this.selectedElement.code].graph.nodes[edge.from.node].outputs[edge.from.slot].connections) delete this.libs[this.selectedElement.library].classes[this.selectedElement.class].methods[this.selectedElement.code].graph.nodes[edge.from.node].outputs[edge.from.slot].connections[eid]
       if (this.libs[this.selectedElement.library].classes[this.selectedElement.class].methods[this.selectedElement.code].graph.nodes[edge.to.node].inputs[edge.to.slot].connections) delete this.libs[this.selectedElement.library].classes[this.selectedElement.class].methods[this.selectedElement.code].graph.nodes[edge.to.node].inputs[edge.to.slot].connections[eid]
@@ -1167,7 +1169,6 @@ export default {
         variable: this.libs[this.selectedElement.library].classes[this.selectedElement.class].methods[this.selectedElement.code].context[info.path][info.code],
         context: info.path
       }
-      console.log('select cfv', this.selectedVariable)
     },
     /**
       Remove function variable
@@ -1203,7 +1204,6 @@ export default {
       Changes selected function variable
     */
     selectedClassFunctionVariableChanged (data) {
-      console.log('changed cfv', data)
       /**/
       this.libs[this.selectedElement.library].classes[this.selectedElement.class].methods[this.selectedElement.code].context[this.selectedVariable.context][this.selectedVariable.variable.code] = {
         ...jclone(this.selectedVariable.variable),
@@ -1235,7 +1235,6 @@ export default {
       Changes selected function variable type
     */
     selectedClassFunctionVariableTypeChanged () {
-      console.log('type changed cfv')
       /**/
       Object.keys(this.libs[this.selectedElement.library].classes[this.selectedElement.class].methods[this.selectedElement.code].graph.nodes).forEach(nid => {
         const node = this.libs[this.selectedElement.library].classes[this.selectedElement.class].methods[this.selectedElement.code].graph.nodes[nid]
@@ -1253,7 +1252,6 @@ export default {
       Update selected function name
     */
     updateSelectedClassFunctionName (next) {
-      console.log('update cfv', next)
       /**/
       this.libs[this.selectedElement.library].classes[this.selectedElement.class].methods[this.selectedElement.code].name = next
       this.isSaved = false
