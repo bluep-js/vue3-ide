@@ -54,6 +54,10 @@ $panelTextSize: 22px;
           }
         }
       }
+      &.panel-body-scrollable {
+        // overflow-y: scroll;
+        // overflow: hidden;
+      }
     }
   }
 }

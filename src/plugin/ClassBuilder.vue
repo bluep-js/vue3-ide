@@ -1,5 +1,5 @@
 <script>
-import { jclone } from './utils.js'
+import { jclone, waitFor } from './utils.js'
 import { v4 as uuid } from 'uuid'
 import VariableButton from './PanelVariableButton.vue'
 // import VariableIcon from './VariableIcon.vue'
@@ -128,7 +128,7 @@ export default {
       if (infs[0] === 'library') add.library = infs[1]
       this.data.extends[infs.join('/')] = add
       this.selExtends = ''
-      this.saved = false
+      this.updateValue()
     },
     removeExtends (ext) {
       if (ext.module) {
@@ -137,7 +137,7 @@ export default {
       if (ext.library) {
         delete this.data.extends[`library/${ext.library}/${ext.code}`]
       }
-      this.saved = false
+      this.updateValue()
     },
     // methods
     async addMethod () {
@@ -162,14 +162,14 @@ export default {
       fn.access = 'public'
       if (!this.data.methods) this.data.methods = {}
       this.data.methods[fn.code] = fn
-      this.saved = false
       this.selMethod = ''
+      this.updateValue()
     },
     selectFnInout (inf) {
       // console.log('select inout', inf)
       this.selectedFnInout = inf
     },
-    updateFnInout (/*inf*/) {
+    updateFnInout () {
       /*
       // Object.keys(
       const sel = this.selectedFnInout
@@ -190,13 +190,13 @@ export default {
         console.log('update fn inout', inf, sel, enid)
       }
       */
-      this.saved = false
+      this.updateValue()
     },
     async removeMethod (code) {
       const ok = await this.dialogs.confirm('Remove Method?')
       if (!ok) return
       delete this.data.methods[code]
-      this.saved = false
+      this.updateValue()
     },
     overrideMethod (code) {
       const src = this.extendsMethods[code]
@@ -215,18 +215,11 @@ export default {
       // console.log('override', info, code, fn)
       if (!this.data.methods) this.data.methods = {}
       this.data.methods[fn.code] = fn
-      this.saved = false
+      this.updateValue()
     },
     // properties schema
     async addValue () {
-      const code = await this.dialogs.prompt('Field Code')
-      const exts = this.extendsProps
-      if (!code || !code.length || this.data.schema[code] || exts[code]) {
-        if (code && (this.data.schema[code] || exts[code])) {
-          await this.dialogs.alert('Already exists')
-        }
-        return
-      }
+      const code = uuid()
       this.data.schema[code] = {
         code,
         name: 'Variable',
@@ -234,11 +227,12 @@ export default {
         access: 'public',
         isArray: false
       }
-      this.saved = false
       this.selected = code
+      this.updateValue()
     },
-    updateValue () {
+    async updateValue () {
       // console.log(this.selected, data)
+      await waitFor(0)
       this.saved = false
     },
     delValue (vcode) {
@@ -414,7 +408,6 @@ export default {
             class="mb-2"
           >
             <VariableButton
-              withCode="1"
               withAccess="1"
               :variable="data.schema[vcode]"
               :types="types"
@@ -429,7 +422,6 @@ export default {
             class="mb-2"
           >
             <VariableButton
-              withCode="1"
               withAccess="1"
               withSource="1"
               noRemove="1"

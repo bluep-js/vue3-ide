@@ -13,7 +13,7 @@ import StructBuilder from './StructBuilder.vue'
 import ClassBuilder from './ClassBuilder.vue'
 
 import { jclone, waitFor } from './utils.js'
-// import { classCombined } from './graph.js'
+import { classParents, classCombined } from './graph.js'
 
 const defaultIcons = {
   enum: 'fas fa-list-ol',
@@ -32,6 +32,30 @@ const defaultIcons = {
   run: 'fas fa-play',
   close: 'fas fa-times',
   fw: 'fa-fw'
+}
+
+const defaultFeatures = {
+  save: true,
+  run: true,
+  panels: {
+    librarySelector: true,
+    libraryContent: true,
+    variablesBar: true,
+    variablePanel: true
+  },
+  create: {
+    libraries: false,
+    classes: true,
+    functions: true,
+    events: true,
+    structs: true,
+    enums: true,
+    consts: true
+  },
+  limit: {
+    nodes: [],
+    types: []
+  }
 }
 
 export default {
@@ -86,6 +110,7 @@ export default {
       type: Object,
       default: () => ({
         icons: defaultIcons,
+        features: defaultFeatures,
         // dialogs: {
         // prompt, alert, confirm
         // },
@@ -112,8 +137,22 @@ export default {
     }
   },
   created () {
-    const opts = this.options
+    const opts = this.options || {}
     opts.icons = { ...defaultIcons, ...(opts.icons || {}) }
+    if (!opts.features) {
+      opts.features = defaultFeatures
+    } else {
+      Object.keys(defaultFeatures).forEach(k => {
+        if (typeof opts.features[k] === 'undefined') {
+          opts.features[k] = defaultFeatures[k]
+        } else {
+          if (typeof opts.features[k] === 'object') {
+            opts.features[k] = { ...defaultFeatures[k], ...opts.features[k] }
+          }
+        }
+      })
+    }
+    // console.log('editor features', opts)
     let lib = null
     let el = null
     if (opts && opts.select) {
@@ -262,7 +301,9 @@ export default {
           node.addable = true
           node.code += `/${eid}`
           node.data = jclone(enm)
-          node.name = `"${enm.name}" ${node.name}`
+          node.data.library = this.currentLibrary
+          // node.name = `"${enm.name}" ${node.name}`
+          node.name = enm.name
           Object.keys(node.inputs).forEach(slot => {
             // node.inputs[slot] = jclone(fn.context.inputs[slot])
             if (node.inputs[slot].type.startsWith('bluep/enum')) {
@@ -286,7 +327,9 @@ export default {
             node.addable = true
             node.code += `/${eid}`
             node.data = jclone(enm)
-            node.name = `"${enm.name}" ${node.name}`
+            node.data.module = m.code
+            // node.name = `"${enm.name}" ${node.name}`
+            node.name = enm.name
             Object.keys(node.inputs).forEach(slot => {
               // node.inputs[slot] = jclone(fn.context.inputs[slot])
               if (node.inputs[slot].type.startsWith('bluep/enum')) {
@@ -411,14 +454,42 @@ export default {
         // console.log('this', node)
         ret.push(node)
       }
-      Object.keys(this.libraries[this.currentLibrary].classes || {}).forEach(clsCode => {
-        // const cls = classCombined(clsCode, this.currentLibrary, this.libraries, this.modules)
-        const cls = this.libraries[this.currentLibrary].classes[clsCode]
-        // console.log(sec, 'cls', cls)
-        /**/
-        const classVariableGet = this.nodes.find(node => node.code === 'class/get')
-        const classVariableSet = this.nodes.find(node => node.code === 'class/set')
-        Object.values(cls.schema || {}).forEach(prop => {
+      const classesList = Object.values(this.libraries[this.currentLibrary].classes || {})
+      Object.values(this.modules || {}).forEach(m => {
+        Object.values(m.classes || {}).forEach(cls => {
+          cls.module = m.code
+          classesList.push(cls)
+        })
+      })
+
+      // console.log(classesList)
+      // Object.keys(this.libraries[this.currentLibrary].classes || {}).forEach(clsCode => {
+      const classVariableGet = this.nodes.find(node => node.code === 'class/get')
+      const classVariableSet = this.nodes.find(node => node.code === 'class/set')
+      const classMethod = this.nodes.find(node => node.code === 'class/method')
+      const classCastTo = this.nodes.find(node => node.code === 'class/castto')
+      const classConstructor = this.nodes.find(node => node.code === 'class/Constructor')
+      classesList.forEach(cls => {
+        /* parents cast to class */
+        const parentsInfo = classParents(cls.code, cls.library || cls.module, this.libraries, this.modules)
+        const parentsList = [...parentsInfo.direct, ...parentsInfo.back]
+        const clsCombined = classCombined(cls.code, cls.library || cls.module, this.libraries, this.modules)
+        parentsList.forEach(prnt => {
+          const node = jclone(classCastTo)
+          node.addable = true
+          node.name = `${prnt.src.name} >> ${cls.name}`
+          node.code += `/${prnt.code}/${cls.code}`
+          node.data = {
+            from: prnt.code,
+            to: cls.code
+          }
+          node.inputs.object.type += '/' + prnt.code
+          node.outputs.object.type += '/' + cls.code
+          ret.push(node)
+        })
+        /* class properties (schema) */
+        const clsSchema = { ...(cls.schema || {}), ...(clsCombined.deep.schema || {}) }
+        Object.values(clsSchema || {}).forEach(prop => {
           // console.log('prop', cls.name, prop, cls.code, sec)
           if (prop.access !== 'public' && cls.code !== sec) return
           const node = jclone(classVariableGet)
@@ -434,6 +505,8 @@ export default {
           node.inputs.object.type += `/${cls.code}`
           ret.push(node)
 
+          if (prop.readonly) return
+
           const node2 = jclone(classVariableSet)
           node2.addable = true
           node2.name = `Set ${cls.name}::${prop.name}`
@@ -447,8 +520,7 @@ export default {
           node2.inputs.object.type += `/${cls.code}`
           ret.push(node2)
         })
-        /**/
-        const classMethod = this.nodes.find(node => node.code === 'class/method')
+        /* class methods */
         Object.values(cls.methods || {}).forEach(mth => {
           if (mth.access !== 'public' && cls.code !== sec) return
           if (mth.type === 'method') {
@@ -457,10 +529,13 @@ export default {
             node.name = `${cls.name}::${mth.name}`
             node.code += `/${cls.code}/${mth.code}`
             node.data = {
-              context: 'schema',
               code: mth.code,
               class: cls.code,
               library: cls.library
+            }
+            if (this.selectedElement && this.selectedElement.class && this.selectedElement.overrides === mth.code) {
+              node.data.strict = true
+              node.name = 'super* ' + node.name
             }
             Object.keys(mth.context.inputs || {}).forEach(fcode => {
               node.inputs[fcode] = jclone(mth.context.inputs[fcode])
@@ -473,18 +548,44 @@ export default {
           }
         })
       })
-      /*
+      /**/
+      // inside class constructor or method
       if (this.selectedElement && (this.selectedElement.type === 'constructor' || this.selectedElement.type === 'method')) {
-        // const cls = classCombined(this.selectedElement
-        // class variables
-        const classVariableGet = this.nodes.find(node => node.code === 'class/get')
-        const classVariableSet = this.nodes.find(node => node.code === 'class/set')
+        // overrides super methods
+        // const clsFull = classCombined(this.selectedElement.class, this.selectedElement.library, this.libraries, this.modules)
+        const currentClass = this.libraries[this.selectedElement.library].classes[this.selectedElement.class]
+        // console.log('cc', currentClass)
+        Object.values(currentClass.extends || {}).forEach(ext => {
+          if (!this.libraries[ext.library]) return
+          const parentClass = this.libraries[ext.library].classes[ext.code]
+          if (!parentClass) return
+          Object.values(parentClass.methods || {}).forEach(mtd => {
+            if (mtd.type === 'constructor' && this.selectedElement.type === 'constructor') {
+              const superNode = jclone(classConstructor)
+              superNode.addable = true
+              superNode.name = parentClass.name + '::' + superNode.name + '()'
+              superNode.code += `/${parentClass.code}/${mtd.code}`
+              superNode.data = {
+                strict: true,
+                code: mtd.code,
+                class: parentClass.code,
+                library: parentClass.library
+              }
+              Object.keys(mtd.context.inputs || {}).forEach(fcode => {
+                superNode.inputs[fcode] = jclone(mtd.context.inputs[fcode])
+              })
+              ret.push(superNode)
+            }
+          })
+        })
+        // class method variables
         // get nodes
         let paths = ['inputs', 'variables']
         paths.forEach(path => {
-          Object.values(this.libs[this.selectedElement.library].functions[this.selectedElement.code].context[path]).forEach(slot => {
-            const node = jclone(variableGet)
+          Object.values(this.libs[this.selectedElement.library].classes[this.selectedElement.class].methods[this.selectedElement.code].context[path]).forEach(slot => {
+            const node = jclone(classVariableGet)
             node.addable = true
+            node.type = 'getter'
             node.name = `Get ${slot.name}`
             node.code += '/' + slot.code
             node.data = {
@@ -493,15 +594,17 @@ export default {
               name: slot.name,
               type: slot.type
             }
+            delete node.inputs.object
             node.outputs[slot.code] = jclone(slot)
             ret.push(node)
           })
         })
         // set nodes
+        /**/
         paths = ['outputs', 'variables']
         paths.forEach(path => {
-          Object.values(this.libs[this.selectedElement.library].functions[this.selectedElement.code].context[path]).forEach(slot => {
-            const node = jclone(variableSet)
+          Object.values(this.libs[this.selectedElement.library].classes[this.selectedElement.class].methods[this.selectedElement.code].context[path]).forEach(slot => {
+            const node = jclone(classVariableSet)
             node.addable = true
             node.name = `Set ${slot.name}`
             node.code += '/' + slot.code
@@ -511,10 +614,12 @@ export default {
               name: slot.name,
               type: slot.type
             }
+            delete node.inputs.object
             node.inputs[slot.code] = jclone(slot)
             ret.push(node)
           })
         })
+        /**/
       }
       /**/
 
@@ -523,50 +628,108 @@ export default {
       const actorMethod = this.nodes.find(node => node.code === 'actor/method')
       const actorState = this.nodes.find(node => node.code === 'actor/state')
       const doneActors = {}
-      Object.values(this.actors).forEach(actor => {
-        if (doneActors[actor.code]) return
+      Object.values(this.actors || {}).forEach(actor => {
         const getNode = jclone(actorGet)
         getNode.addable = true
         getNode.name = actor.name
-        getNode.code += '/' + actor.code
+        getNode.code += '/' + actor.id
         getNode.outputs.actor.name = actor.name
         getNode.outputs.actor.type += '/' + actor.code
         getNode.data = { actor: actor.id }
         ret.push(getNode)
 
-        const stateNode = jclone(actorState)
-        stateNode.addable = true
-        stateNode.name = actor.name
-        stateNode.code += '/' + actor.code
-        stateNode.inputs.actor.name = actor.name
-        stateNode.inputs.actor.type += '/' + actor.code
-        stateNode.data = { actor: actor.id }
-        Object.keys(actor.state).forEach(field => {
-          stateNode.outputs[field] = jclone(actor.state[field])
-        })
-        ret.push(stateNode)
-
-        Object.values(actor.methods).forEach(method => {
-          const mNode = jclone(actorMethod)
-          mNode.addable = true
-          mNode.code += `/${actor.id}/method/${method.code}`
-          mNode.name = actor.name + ' :: ' + method.name + '()'
-          mNode.data = {
-            actor: actor.id,
-            method: method.code
+        if (!doneActors[actor.code]) {
+          doneActors[actor.code] = {
+            state: false,
+            methods: false,
+            methodsIndex: {}
           }
-          mNode.inputs.actor.name = actor.name
-          mNode.inputs.actor.type += `/${actor.code}`
-          Object.keys(method.inputs || {}).forEach(field => {
-            mNode.inputs[field] = JSON.parse(JSON.stringify(method.inputs[field]))
-          })
-          Object.keys(method.outputs || {}).forEach(field => {
-            mNode.outputs[field] = JSON.parse(JSON.stringify(method.outputs[field]))
-          })
-          ret.push(mNode)
-        })
+        }
 
-        doneActors[actor.code] = true
+        const actorStates = Object.keys(actor.state || {})
+        const actorMStates = Object.keys(actor._metadata.state || {})
+        const actorMethods = Object.keys(actor.methods || {})
+        const actorMMethods = Object.keys(actor._metadata.methods || {})
+
+        const stateSimple = actorStates.length === actorMStates.length && !actorStates.some(field => !actorMStates.includes(field))
+        const methodSimple = actorMethods.length === actorMMethods.length && !actorMethods.some(field => !actorMMethods.includes(field))
+
+        if (stateSimple && !doneActors[actor.code].state) {
+          const stateNode = jclone(actorState)
+          stateNode.addable = true
+          stateNode.name = actor._metadata.name
+          stateNode.code += '/' + actor.id
+          stateNode.inputs.actor.name = actor._metadata.name
+          stateNode.inputs.actor.type += '/' + actor.code
+          stateNode.data = { actor: actor.id }
+          Object.keys(actor.state || {}).forEach(field => {
+            stateNode.outputs[field] = jclone(actor.state[field])
+          })
+          ret.push(stateNode)
+          doneActors[actor.code].state = true
+        }
+        if (!stateSimple) {
+          const stateNode = jclone(actorState)
+          stateNode.addable = true
+          stateNode.name = actor.name
+          stateNode.code += '/' + actor.id
+          stateNode.inputs.actor.name = actor.name
+          stateNode.inputs.actor.type += '/' + actor.code
+          stateNode.data = { actor: actor.id }
+          Object.keys(actor.state || {}).forEach(field => {
+            stateNode.outputs[field] = jclone(actor.state[field])
+          })
+          ret.push(stateNode)
+        }
+
+        if (!doneActors[actor.code].methods) {
+          Object.values(actor._metadata.methods || {}).forEach(method => {
+            const mNode = jclone(actorMethod)
+            mNode.addable = true
+            mNode.code += `/${actor.id}/method/${method.code}`
+            mNode.name = actor._metadata.name + ' :: ' + method.name + '()'
+            mNode.data = {
+              actor: actor.id,
+              method: method.code
+            }
+            mNode.inputs.actor.name = actor._metadata.name
+            mNode.inputs.actor.type += `/${actor.code}`
+            Object.keys(method.inputs || {}).forEach(field => {
+              mNode.inputs[field] = JSON.parse(JSON.stringify(method.inputs[field]))
+            })
+            Object.keys(method.outputs || {}).forEach(field => {
+              mNode.outputs[field] = JSON.parse(JSON.stringify(method.outputs[field]))
+            })
+            ret.push(mNode)
+            doneActors[actor.code].methodsIndex[method.code] = true
+          })
+          doneActors[actor.code].methods = true
+        }
+
+        if (!methodSimple) {
+          Object.values(actor.methods || {}).forEach(method => {
+            if (doneActors[actor.code].methodsIndex[method.code]) return
+            const mNode = jclone(actorMethod)
+            mNode.addable = true
+            mNode.code += `/${actor.id}/method/${method.code}`
+            mNode.name = actor.name + ' :: ' + method.name + '()'
+            mNode.data = {
+              actor: actor.id,
+              method: method.code
+            }
+            mNode.inputs.actor.name = actor.name
+            mNode.inputs.actor.type += `/${actor.code}`
+            Object.keys(method.inputs || {}).forEach(field => {
+              mNode.inputs[field] = JSON.parse(JSON.stringify(method.inputs[field]))
+            })
+            Object.keys(method.outputs || {}).forEach(field => {
+              mNode.outputs[field] = JSON.parse(JSON.stringify(method.outputs[field]))
+            })
+            ret.push(mNode)
+            doneActors[actor.code].methodsIndex[method.code] = true
+          })
+          doneActors[actor.code].methods = true
+        }
       })
 
       return ret
@@ -652,7 +815,7 @@ export default {
         })
 
       // modules types
-      let base = { ...ret }
+      // let base = { ...ret }
       Object.values(this.modules).forEach(m => {
         // module enums
         Object.values(m.enums || {})
@@ -670,12 +833,22 @@ export default {
             tp.name = `Struct: ${enm.name}`
             ret[tp.code] = tp
           })
+        // module classes
+        Object.values(m.classes || {})
+          .forEach(enm => {
+            const tp = jclone(this.types['bluep/class'])
+            tp.code += `/${enm.code}`
+            tp.name = `Class: ${enm.name}`
+            ret[tp.code] = tp
+          })
         // module defined types
         // to override automated color
         const tps = jclone(m.types || {})
-        base = { ...base, ...tps }
+        Object.keys(tps).forEach(tk => {
+          ret[tk] = tps[tk]
+        })
       })
-      return base
+      return ret
     }
   },
   methods: {
@@ -794,9 +967,9 @@ export default {
               height: 3000
             },
             zoom: {
-              min: 0.4,
-              max: 5,
-              step: 0.3,
+              min: 0.5,
+              max: 2.0,
+              step: 0.1,
               current: 1
             }
           }
@@ -823,9 +996,11 @@ export default {
           })
         }
         // actor event
+        console.log('add info', info)
         if (info.type === 'event' && info.actor && this.actors[info.actor]) {
           const eventCode = info.code
           const eventInfo = this.actors[info.actor].events[eventCode]
+          console.log('event info', eventInfo)
           data.event = { ...info, info: jclone(eventInfo) }
           data.name = this.actors[info.actor].name + ' ' + eventInfo.name
           Object.keys(eventInfo.outputs || {}).forEach(key => {
@@ -1097,7 +1272,11 @@ export default {
       Update selected function config
     */
     updateSelectedFunctionConfig (next) {
-      this.libs[this.selectedElement.library].functions[this.selectedElement.code].event.config = next
+      if (this.libs[this.selectedElement.library].functions[this.selectedElement.code].event) {
+        this.libs[this.selectedElement.library].functions[this.selectedElement.code].event.config = next
+      } else {
+        this.libs[this.selectedElement.library].functions[this.selectedElement.code].config = next
+      }
       this.isSaved = false
     },
 
@@ -1132,9 +1311,10 @@ export default {
       Add function variable and select it
     */
     addClassFunctionVariable (path) {
-      // console.log('add cfv', path)
+      console.log('add cfv', path)
       /**/
-      if (!this.selectedElement || !(this.selectedElement.type !== 'constructor' || this.selectedElement.type === 'method')) return
+      if (!this.selectedElement || !(this.selectedElement.type === 'constructor' || this.selectedElement.type === 'method')) return
+      // console.log('add cfv', path)
       const vid = uuid()
       const varn = Object.keys(this.libs[this.selectedElement.library].classes[this.selectedElement.class].methods[this.selectedElement.code].context[path]).length
       const slot = {
@@ -1272,7 +1452,7 @@ export default {
       :selectedElement="selectedElement"
       :isSaved="isSaved"
       :icons="options.icons"
-      :canRun="options.canRun"
+      :features="options.features"
       @selectLibrary="selectLibrary"
       @createLibrary="createLibrary"
       @viewLibrary="viewCurrentLibrary"
@@ -1282,41 +1462,50 @@ export default {
   </div>
   <div class="main-area">
     <div v-if="currentLibrary" class="left-bar">
-      <LibraryContentPanel
-        :libraries="libs"
-        :modules="modules"
-        :actors="actors"
-        :currentLibrary="currentLibrary"
-        :selectedElement="selectedElement"
-        :icons="options.icons"
-        @addToLibrary="addToLibrary"
-        @selectElement="selectElement"
-        @deleteElement="deleteElement"
-      />
-      <GraphVariablesPanel
-        v-if="selectedElement?.type === 'function'"
-        :fn="selectedElement"
-        :isMethod="false"
-        :types="typesFull"
-        :icons="options.icons"
-        @addVariable="addFunctionVariable"
-        @editVariable="editFunctionVariable"
-        @deleteVariable="removeFunctionVariable"
-        @updateName="updateSelectedFunctionName"
-        @updateConfig="updateSelectedFunctionConfig"
-      />
-      <GraphVariablesPanel
-        v-if="selectedElement?.type === 'method' || selectedElement?.type === 'constructor'"
-        :fn="selectedElement"
-        :cls="libraries[selectedElement.library].classes[selectedElement.class]"
-        :isMethod="true"
-        :types="typesFull"
-        :icons="options.icons"
-        @addVariable="addClassFunctionVariable"
-        @editVariable="editClassFunctionVariable"
-        @deleteVariable="removeClassFunctionVariable"
-        @updateName="updateSelectedClassFunctionName"
-      />
+      <div class="left-bar-scroll">
+        <LibraryContentPanel
+          :libraries="libs"
+          :modules="modules"
+          :actors="actors"
+          :currentLibrary="currentLibrary"
+          :selectedElement="selectedElement"
+          :icons="options.icons"
+          class="panel-50"
+          @addToLibrary="addToLibrary"
+          @selectElement="selectElement"
+          @deleteElement="deleteElement"
+        />
+        <GraphVariablesPanel
+          v-if="selectedElement?.type === 'function'"
+          :fn="selectedElement"
+          :isMethod="false"
+          :types="typesFull"
+          :icons="options.icons"
+          :libraries="libs"
+          :modules="modules"
+          class="panel-50"
+          @addVariable="addFunctionVariable"
+          @editVariable="editFunctionVariable"
+          @deleteVariable="removeFunctionVariable"
+          @updateName="updateSelectedFunctionName"
+          @updateConfig="updateSelectedFunctionConfig"
+        />
+        <GraphVariablesPanel
+          v-if="selectedElement?.type === 'method' || selectedElement?.type === 'constructor'"
+          :fn="selectedElement"
+          :cls="libraries[selectedElement.library].classes[selectedElement.class]"
+          :isMethod="true"
+          :types="typesFull"
+          :icons="options.icons"
+          :libraries="libs"
+          :modules="modules"
+          class="panel-50"
+          @addVariable="addClassFunctionVariable"
+          @editVariable="editClassFunctionVariable"
+          @deleteVariable="removeClassFunctionVariable"
+          @updateName="updateSelectedClassFunctionName"
+        />
+      </div>
     </div>
     <div class="paper-area">
       <LibraryProperties
@@ -1328,6 +1517,7 @@ export default {
       />
       <GraphBuilder
         :libraries="libs"
+        :modules="modules"
         :types="typesFull"
         :nodes="nodesFull"
         :currentLibrary="currentLibrary"
@@ -1338,6 +1528,7 @@ export default {
       />
       <GraphBuilder
         :libraries="libs"
+        :modules="modules"
         :types="typesFull"
         :nodes="nodesFull"
         :currentLibrary="currentLibrary"
@@ -1444,6 +1635,16 @@ export default {
   width: $panelWidth;
   max-width: $panelWidth;
   border-right: $borderColor solid 1px;
+  // overflow: hidden;
+  // max-height: 90%;
+
+  .left-bar-scroll {
+    // max-height: 100%;
+    // overflow-y: scroll;
+  }
+  .panel-50 {
+    // max-height: 50%;
+  }
 }
 
 .paper-area {

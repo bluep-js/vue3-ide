@@ -3,6 +3,8 @@ import GraphVariablesBar from './GraphVariablesBar.vue'
 import ValueWidget from './ValueWidget.vue'
 // import parser from 'cron-parser'
 
+import { classCombined } from './graph.js'
+
 export default {
   components: {
     GraphVariablesBar,
@@ -11,6 +13,8 @@ export default {
   props: [
     'fn',
     'cls',
+    'libraries',
+    'modules',
     'types',
     'icons',
     'isMethod'
@@ -25,13 +29,20 @@ export default {
   data () {
     return {
       fnname: this.fn.name || '',
-      config: this.fn.event?.config || {}
+      config: this.fn.event?.config || this.fn.config || {}
     }
   },
   computed: {
     confs () {
       const ret = []
       // console.log('confs', this.fn)
+      if (this.fn.type === 'function' && !this.fn.event) {
+        return [{
+          code: 'dashboard',
+          name: 'Dashboard',
+          type: 'basic/boolean'
+        }]
+      }
       if (!this.fn.event?.info?.config) {
         return ret
       }
@@ -43,6 +54,12 @@ export default {
     canBeRenamed () {
       if (this.fn.type === 'constructor') return false
       return true
+    },
+    clsProps () {
+      if (!this.cls) return {}
+      const full = classCombined(this.cls.code, this.cls.library, this.libraries, this.modules)
+      const ret = { ...full.schema, ...full.deep.schema }
+      return ret
     }
   },
   methods: {
@@ -55,7 +72,7 @@ export default {
     fn: {
       handler (next) {
         this.fnname = next.name || ''
-        this.config = next.event?.config || {}
+        this.config = next.event?.config || next.config || {}
       }
     }
   }
@@ -81,17 +98,17 @@ export default {
       Configuration
     </div>
     <div class="panel-body" v-if="confs.length">
-      <div v-for="cfg of confs" :key="cfg.code" class="d-flex">
+      <div v-for="cfg of confs" :key="cfg.code" class="config-row">
         <label>{{cfg.name}}</label>
         <ValueWidget
           :info="cfg"
           v-model="config[cfg.code]"
           :inPanel="true"
+          :icons="icons"
           @update:modelValue="$emit('updateConfig', config)"
         />
       </div>
     </div>
-    <div class="panel-header" v-if="confs.length"/>
     <div class="panel-body">
       <GraphVariablesBar
         v-if="!fn.event"
@@ -99,18 +116,20 @@ export default {
         :types="types"
         :variables="fn.context.inputs"
         :icons="icons"
+        :readOnly="!!fn.overrides"
         class="mb-10"
         @addVariable="$emit('addVariable', 'inputs')"
         @deleteVariable="$emit('deleteVariable', { code: $event, path: 'inputs' })"
         @editVariable="$emit('editVariable', { code: $event, path: 'inputs' })"
       />
       <GraphVariablesBar
-        v-if="!fn.event"
+        v-if="!fn.event && fn.type !== 'constructor'"
         :name="'Outputs'"
         :types="types"
         :icons="icons"
         class="mb-10"
         :variables="fn.context.outputs"
+        :readOnly="!!fn.overrides"
         @addVariable="$emit('addVariable', 'outputs')"
         @deleteVariable="$emit('deleteVariable', { code: $event, path: 'outputs' })"
         @editVariable="$emit('editVariable', { code: $event, path: 'outputs' })"
@@ -129,7 +148,7 @@ export default {
         :readOnly="true"
         :name="'Properties'"
         :types="types"
-        :variables="cls.schema"
+        :variables="clsProps"
         :icons="icons"
       />
     </div>
@@ -157,5 +176,10 @@ label {
     margin: 0;
     margin-right: 1rem;
   }
+}
+
+.config-row {
+  display: flex;
+  justfify-content: space-between;
 }
 </style>

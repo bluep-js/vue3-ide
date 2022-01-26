@@ -189,6 +189,7 @@ export default {
                 v-model="vr.value"
                 :libraries="libraries"
                 :currentLibrary="currentLibrary"
+                :icons="icons"
                 :types="types"
                 :info="vr"
                 inPanel="1"

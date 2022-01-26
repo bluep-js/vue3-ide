@@ -22,9 +22,9 @@ export default {
       type: Object,
       default: () => null
     },
-    canRun: {
-      type: Boolean,
-      default: true
+    features: {
+      type: Object,
+      required: true
     }
   },
   emits: [
@@ -72,7 +72,7 @@ export default {
 
 <template>
 <div class="topbar-wrapper bluep-panel-wrapper">
-  <div class="library-selector">
+  <div v-if="features.panels.librarySelector" class="library-selector">
     <span>Library:</span>
     <div class="ml-5 no-wrap">
       <select @change="librarySelectorChange" class="panel-input text-dark">
@@ -127,9 +127,9 @@ export default {
     </div>
   </div>
   <div class="controls">
-    <button class="icon-button" :disabled="isSaved" @click="$emit('saveClick')"><i :class="icons.save + ' ' + icons.fw"></i> Save</button>
+    <button v-if="features.save" class="icon-button" :disabled="isSaved" @click="$emit('saveClick')"><i :class="icons.save + ' ' + icons.fw"></i> Save</button>
     <button
-      v-if="canRun && selectedElement?.type === 'function' && !selectedElement?.event"
+      v-if="features.run && selectedElement?.type === 'function' && !selectedElement?.event"
       class="icon-button"
       :disabled="!isSaved"
       @click="$emit('runClick')"
