@@ -121,8 +121,12 @@ export const availableClasses = (libraries, library, modules) => {
  */
 export const classParents = (classCode, library, libraries, modules) => {
   const ret = { direct: [], back: [] }
-  const cls = libraries[library].classes[classCode]
-  if (!Object.keys(cls.extends || {}).length) return ret
+  const cls = libraries[library]
+    ? libraries[library].classes[classCode]
+    : modules && modules[library] && modules[library].classes
+      ? modules[library].classes[classCode]
+      : null
+  if (!cls || !Object.keys(cls.extends || {}).length) return ret
   Object.values(cls.extends).forEach(ext => {
     const inf = { ...ext }
     if (ext.module && modules && modules[ext.module] && modules[ext.module].classes[ext.code]) {
@@ -185,8 +189,13 @@ export const classIsParentOfClass = (parentCode, childCode, libraries, modules) 
  *  @returns {object|null} full class combined object
  */
 export const classCombined = (code, library, libraries, modules) => {
-  if (!libraries[library].classes[code]) return null
-  const cls = jclone(libraries[library].classes[code])
+  const src = libraries[library]
+    ? libraries[library]
+    : modules && modules[library]
+      ? modules[library]
+      : null
+  if (!src || !src.classes || !src.classes[code]) return null
+  const cls = jclone(src.classes[code])
   const parents = classParents(code, library, libraries, modules)
   const list = [...parents.direct, ...parents.back]
   cls.deep = {
@@ -203,7 +212,9 @@ export const classCombined = (code, library, libraries, modules) => {
       cls.deep.schema[fld] = jclone(parent.src.schema[fld])
       cls.deep.schema[fld].source = {
         library: parent.library,
-        libraryName: libraries[parent.library].name,
+        libraryName: parent.library
+          ? libraries[parent.library].name
+          : modules[parent.module].name,
         code: parent.src.code,
         name: parent.src.name
       }
@@ -216,7 +227,10 @@ export const classCombined = (code, library, libraries, modules) => {
         cls.deep.overrides[mcode] = jclone(parent.src.methods[mcode])
         cls.deep.overrides[mcode].source = {
           library: parent.library,
-          libraryName: libraries[parent.library].name,
+          // libraryName: libraries[parent.library].name,
+          libraryName: parent.library
+            ? libraries[parent.library].name
+            : modules[parent.module].name,
           code: parent.src.code,
           name: parent.src.name
         }
@@ -229,7 +243,10 @@ export const classCombined = (code, library, libraries, modules) => {
       cls.deep.methods[mcode] = jclone(parent.src.methods[mcode])
       cls.deep.methods[mcode].source = {
         library: parent.library,
-        libraryName: libraries[parent.library].name,
+        // libraryName: libraries[parent.library].name,
+        libraryName: parent.library
+          ? libraries[parent.library].name
+          : modules[parent.module].name,
         code: parent.src.code,
         name: parent.src.name
       }

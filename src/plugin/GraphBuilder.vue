@@ -18,6 +18,7 @@ export default {
     'types',
     'icons',
     'libraries',
+    'modules',
     'currentLibrary'
   ],
   emits: [
@@ -32,16 +33,32 @@ export default {
       mouseHold: false,
       dragField: false,
       dragNode: null,
-      lastMouse: null,
+      lastMouse: {
+        x: 0,
+        y: 0,
+        cx: 0,
+        cy: 0,
+        lx: 0,
+        ly: 0,
+        ox: 0,
+        oy: 0,
+        delta: {
+          x: 0,
+          y: 0
+        },
+        paperX: 0,
+        paperY: 0
+      },
       contextMenu: {
         show: false,
         filter: '',
         x: 0,
         y: 0
       },
-      dragSlot: null
+      dragSlot: null,
+      selectedNodes: [],
+      selectorRect: null
       /*
-      selectedNode: null,
       selectedEdge: null,
       */
     }
@@ -190,6 +207,8 @@ export default {
         // new nodes
         // methods nodes
         // constructor nodes
+        // classes variables/props getters/setters
+        // actors nodes
 
         this.graph.nodes[ncode].valid = nodeValid
       })
@@ -215,8 +234,8 @@ export default {
     },
     slotPoint ({ node, shift }) {
       const pos = {
-        x: this.layout.parts[node.id].x + shift.x,
-        y: this.layout.parts[node.id].y + shift.y
+        x: Math.round(this.layout.parts[node.id].x + Math.round(shift.x / this.layout.zoom.current)),
+        y: Math.round(this.layout.parts[node.id].y + Math.round(shift.y / this.layout.zoom.current))
       }
       return pos
     },
@@ -250,6 +269,7 @@ export default {
       this.emitUpdate()
     },
     nodeDragged (node, shift) {
+      if (!node) return
       this.layout.parts[node.id].x += shift.x
       this.layout.parts[node.id].y += shift.y
       Object.values(node.inputs || {}).forEach(slot => {
@@ -272,7 +292,7 @@ export default {
         return
       }
       const from = this.slotPoint(info)
-      const to = this.paperPoint()
+      const to = { x: this.lastMouse.paperX, y: this.lastMouse.paperY }
       const mid = this.midPoint(from, to)
       this.dragSlot = { ...info, from, to, mid }
     },
@@ -302,7 +322,6 @@ export default {
         from: { ...pointFrom },
         to: { ...pointTo }
       }
-      // TODO:
       // let's check if there are already edges for this slot
       // input slot may have multiple connections only if it is basic/execute type
       // output slot may have multiple connections only if it is not basic/execute type
@@ -385,22 +404,40 @@ export default {
       })
 
       delete this.graph.nodes[node.id]
-      delete this.layout[node.id]
+      delete this.layout.parts[node.id]
       this.emitUpdate()
     },
-    /*
+    /**/
+    updateLastMouse (e) {
+      const delta = {
+        x: -this.lastMouse.cx + e.clientX,
+        y: -this.lastMouse.cy + e.clientY
+      }
+      this.lastMouse.x = e.pageX
+      this.lastMouse.y = e.pageY
+      this.lastMouse.cx = e.clientX
+      this.lastMouse.cy = e.clientY
+      this.lastMouse.ox = e.offsetX
+      this.lastMouse.oy = e.offsetY
+      this.lastMouse.lx = e.layerX
+      this.lastMouse.ly = e.layerY
+      this.lastMouse.delta = delta
+      if (e.path[0].nodeName === 'svg' && e.path[0].className.baseVal === 'field-svg') {
+        this.lastMouse.paperX = this.lastMouse.ox
+        this.lastMouse.paperY = this.lastMouse.oy
+      } else {
+        this.lastMouse.paperX += delta.x
+        this.lastMouse.paperY += delta.y
+      }
+    },
     /**/
     mouseMove (e) {
-      this.lastMouse = {
-        x: e.pageX,
-        y: e.pageY,
-        cx: e.clientX,
-        cy: e.clientY
-      }
+      this.updateLastMouse(e)
+      // field drag
       if (this.dragField) {
         e.preventDefault()
-        this.layout.field.top += e.movementY
-        this.layout.field.left += e.movementX
+        this.layout.field.top += this.lastMouse.delta.y
+        this.layout.field.left += this.lastMouse.delta.x
         if (this.layout.field.top > -50) {
           this.layout.field.top -= 500
           this.layout.field.height += 500
@@ -435,25 +472,72 @@ export default {
         this.emitUpdate()
         // return
       }
+      // node drag
       if (this.dragNode) {
         e.preventDefault()
-        this.nodeDragged(this.dragNode, { x: e.movementX, y: e.movementY })
+        const dz = {
+          x: Math.round(this.lastMouse.delta.x / this.layout.zoom.current),
+          y: Math.round(this.lastMouse.delta.y / this.layout.zoom.current)
+        }
+        if (this.selectedNodes.length) {
+          this.selectedNodes.forEach(nid => {
+            this.nodeDragged(this.graph.nodes[nid], dz)
+          })
+        } else {
+          this.nodeDragged(this.dragNode, dz)
+        }
         this.emitUpdate()
       }
       if (this.dragSlot) {
         e.preventDefault()
-        this.dragSlot.to = this.paperPoint(e)
+        this.dragSlot.to = { x: this.lastMouse.paperX, y: this.lastMouse.paperY }
         this.dragSlot.mid = this.midPoint(this.dragSlot.from, this.dragSlot.to)
+      }
+      // selector rect
+      if (this.selectorRect) {
+        e.preventDefault()
+        this.selectorRect.toX = this.lastMouse.paperX
+        this.selectorRect.toY = this.lastMouse.paperY
+        const selection = []
+        Object.keys(this.layout.parts).forEach(pid => {
+          if (pid.startsWith('edge_')) return
+          const p = this.layout.parts[pid]
+          const r = this.selectorRectSvg
+          if (p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h) selection.push(pid)
+        })
+        this.selectedNodes = [...selection]
       }
     },
     rightClick (e) {
-      this.contextMenu.x = e.layerX
-      this.contextMenu.y = e.layerY
+      this.updateLastMouse(e)
+      this.selectedNodes = []
+      this.contextMenu.x = this.lastMouse.paperX
+      this.contextMenu.y = this.lastMouse.paperY
       this.contextMenu.show = true
     },
     mouseDown (e) {
+      // console.log(e.buttons)
+      this.updateLastMouse(e)
       // only left mouse down
       if (e.buttons === 1) {
+        if (e.path[0].nodeName === 'svg' && e.path[0].className.baseVal === 'field-svg') {
+          // selectorRect
+          this.contextMenu.show = false
+          this.contextMenu.filter = ''
+          this.selectedNodes = []
+          if (!this.selectorRect) {
+            this.selectorRect = {
+              fromX: this.lastMouse.paperX,
+              fromY: this.lastMouse.paperY,
+              toX: this.lastMouse.paperX,
+              toY: this.lastMouse.paperY
+            }
+          }
+        }
+      }
+      // only middle mouse down
+      if (e.buttons === 4) {
+        // field drag on middle mouse
         if (e.path[0].nodeName === 'svg' && e.path[0].className.baseVal === 'field-svg') {
           this.contextMenu.show = false
           this.contextMenu.filter = ''
@@ -464,6 +548,7 @@ export default {
     mouseUp () {
       this.dragField = false
       this.dragNode = null
+      this.selectorRect = null
       /*
       if (this.dragSlot) {
         this.contextMenu.filter = this.dragSlot.type + ''
@@ -474,6 +559,36 @@ export default {
       }
       */
       this.dragSlot = null
+    },
+    mouseWheel (e) {
+      /**/
+      // this.updateLastMouse(e)
+      if (this.layout.zoom.step !== 0.1) this.layout.zoom.step = 0.1
+      if (this.layout.zoom.min !== 0.5) this.layout.zoom.min = 0.5
+      if (this.layout.zoom.max !== 2.0) this.layout.zoom.max = 2.0
+      const dir = e.deltaY > 0 ? 1 : -1
+      const step = this.layout.zoom.step * dir
+      const next = this.round(this.layout.zoom.current - step, 1)
+      // console.log('next zoom', next)
+      // const lastmp = { x: this.lastMouse.paperX, y: this.lastMouse.paperY }
+      if (next >= this.layout.zoom.min && next <= this.layout.zoom.max) {
+        this.layout.zoom.current = next
+        this.emitUpdate()
+        /*
+        waitFor(0).then(() => {
+          this.updateLastMouse(e)
+          const nextmp = { x: this.lastMouse.paperX, y: this.lastMouse.paperY }
+          const delta = {
+            x: lastmp.x - nextmp.x,
+            y: lastmp.y - nextmp.y
+          }
+          this.layout.field.top -= delta.y
+          this.layout.field.left -= delta.x
+          // this.layout
+          console.log(delta)
+        })
+        /**/
+      }
     },
     emitUpdate () {
       const next = { ...this.modelValue }
@@ -490,6 +605,11 @@ export default {
         }
       })
       return ftp ? this.types[ftp].color : '#999'
+    },
+    round (num, digits = 4) {
+      if (typeof num !== 'number') return 0
+      const d = Math.pow(10, digits)
+      return Math.round(num * d) / d
     }
   },
   computed: {
@@ -530,6 +650,33 @@ export default {
         horizontal.push(i)
       }
       return { vertical, horizontal }
+    },
+    zoom () {
+      return Math.floor(this.layout.zoom.current * 100) + '%'
+    },
+    selectorRectSvg () {
+      const ret = {
+        x: 0,
+        y: 0,
+        w: 0,
+        h: 0
+      }
+      if (!this.selectorRect) return ret
+      if (this.selectorRect.fromX < this.selectorRect.toX) {
+        ret.x = this.selectorRect.fromX
+        ret.w = this.selectorRect.toX - this.selectorRect.fromX
+      } else {
+        ret.x = this.selectorRect.toX
+        ret.w = this.selectorRect.fromX - this.selectorRect.toX
+      }
+      if (this.selectorRect.fromY < this.selectorRect.toY) {
+        ret.y = this.selectorRect.fromY
+        ret.h = this.selectorRect.toY - this.selectorRect.fromY
+      } else {
+        ret.y = this.selectorRect.toY
+        ret.h = this.selectorRect.fromY - this.selectorRect.toY
+      }
+      return ret
     }
   }
 }
@@ -537,6 +684,16 @@ export default {
 
 <template>
 <div class="wrapper">
+  <div class="tools">
+    <!--
+    <div class="coords">
+      X: {{lastMouse.paperX}} Y: {{lastMouse.paperY}}
+    </div>
+    -->
+    <div class="zoom">
+      Zoom: {{zoom}}
+    </div>
+  </div>
   <div
     ref="paper"
     class="paper"
@@ -549,8 +706,10 @@ export default {
         top: layout.field.top + 'px',
         left: layout.field.left + 'px',
         width: layout.field.width + 'px',
-        height: layout.field.height + 'px'
+        height: layout.field.height + 'px',
+        transform: `scale(${layout.zoom.current}, ${layout.zoom.current})`,
       }"
+      @wheel="mouseWheel"
       @mousemove="mouseMove"
       @mousedown="mouseDown"
       @mouseup="mouseUp"
@@ -593,6 +752,7 @@ export default {
           :x2="fieldWidth"
           :y2="l"
         />
+        <!-- drag slot -->
         <path
           v-if="dragSlot"
           :d="slotDragPath"
@@ -600,6 +760,19 @@ export default {
           :stroke-width="2"
           fill="transparent"
         />
+        <!-- selector rect -->
+        <rect
+          v-if="selectorRect"
+          :x="selectorRectSvg.x"
+          :y="selectorRectSvg.y"
+          :width="selectorRectSvg.w"
+          :height="selectorRectSvg.h"
+          stroke="yellow"
+          stroke-width="1"
+          stroke-dasharray="10,10,5,5,5,10"
+          fill="rgba(255,255,255,0.1)"
+        />
+        <!-- edges -->
         <GraphEdge
           v-for="edge of Object.values(graph.edges)"
           :key="edge.id"
@@ -607,10 +780,6 @@ export default {
           :layout="layout"
           :types="types"
         />
-        <!--
-        @dragged="nodeDragged(nd, $event)"
-        :fn="modelValue"
-        -->
       </svg>
       <GraphNode
         v-for="nd of Object.values(graph.nodes)"
@@ -618,10 +787,12 @@ export default {
         v-model="graph.nodes[nd.id]"
         :types="types"
         :libraries="libraries"
+        :modules="modules"
         :currentLibrary="currentLibrary"
         :layout="layout.parts[nd.id]"
         :dragSlot="dragSlot"
         :icons="icons"
+        :selected="selectedNodes.includes(nd.id)"
         @draggable="setDragNode(nd, $event)"
         @slotDraggable="slotDrag"
         @slotDropped="slotDropped"
@@ -640,6 +811,38 @@ export default {
 
 .wrapper {
   height: 100%;
+  position: relative;
+}
+
+.tools {
+  position: absolute;
+  top: 10px;
+  right: 30px;
+
+  border: 1px solid $borderColor;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  justify-content: stretch;
+
+  > div {
+    padding-right: 10px;
+
+    &:last-child {
+      padding-right: 0;
+    }
+  }
+
+  &::after {
+    content: '';
+    background: #fff;
+    opacity: 0.1;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+  }
 }
 
 .paper

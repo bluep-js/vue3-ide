@@ -1,6 +1,6 @@
 {
   "name": "@bluepjs/vue3-ide",
-  "version": "0.2.2",
+  "version": "0.3.4",
   "description": "IDE for @bluepjs blueprints",
   "main": "./dist/editor.common.js",
   "module": "./dist/editor.umd.min.js",

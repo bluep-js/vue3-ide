@@ -10,7 +10,9 @@ export default {
     'node',
     'modelValue',
     'types',
+    'icons',
     'libraries',
+    'modules',
     'currentLibrary',
     'direction',
     'dragSlot',
@@ -22,7 +24,9 @@ export default {
     'dropped',
     'clearMe',
     'shiftUpdated',
-    'templateUpdate'
+    'templateUpdate',
+    'multipleAdd',
+    'multipleRemove'
   ],
   data () {
     return {
@@ -153,6 +157,24 @@ export default {
       if (this.slot.type) list.push(`connector-${this.slot.type.replaceAll('/', '-')}`)
       if (!this.canConnect) list.push('connector-invisible')
       return list.join(' ')
+    },
+    canMultipleAdd () {
+      if (!this.slot.multiple) return false
+      if (!this.node.multiples || !this.node.multiples[this.slot.multiple]) return false
+      if (this.slot.code.includes('_multiple_')) return false
+      if (this.direction === 'outputs') return false
+      const m = this.node.multiples[this.slot.multiple]
+      if (typeof m.max !== 'number') return true
+      return m.max > m.value
+    },
+    canMultipleRemove () {
+      if (!this.slot.multiple) return false
+      if (!this.node.multiples || !this.node.multiples[this.slot.multiple]) return false
+      if (!this.slot.code.includes('_multiple_')) return false
+      if (this.direction === 'outputs') return false
+      const m = this.node.multiples[this.slot.multiple]
+      const min = typeof m.min === 'number' && m.min >= 1 ? m.min : 1
+      return m.value > min
     }
   },
   watch: {
@@ -171,28 +193,28 @@ export default {
         shift: this.getShift()
       })
     }
-    /*
-    // TODO: template
-    node: {
-      deep: true,
-      handler (next) {
-        console.log('next node', next)
-      }
-    }
-    */
   }
 }
 </script>
 
 <template>
-<div :class="'slot-'+direction">
+<div :class="`slot-${direction} ${canMultipleRemove ? 'slot-multiple-removable' : ''}`">
+  <button
+    v-if="canMultipleRemove"
+    class="icon-button button-multiple-remove"
+    @click="$emit('multipleRemove')"
+  >
+    <i :class="icons.remove"></i>
+  </button>
   <ValueWidget
     v-if="canManual"
     v-model="slot.value"
     :info="slot"
     :inSlot="true"
     :types="types"
+    :icons="icons"
     :libraries="libraries"
+    :modules="modules"
     :currentLibrary="currentLibrary"
     @update:modelValue="updateSlot"
   />
@@ -206,7 +228,14 @@ export default {
     :title="slot.type"
     @mouseup="mouseUp"
     @mousedown.stop.prevent="mouseDown"
-  ></div>
+  />
+  <button
+    v-if="canMultipleAdd"
+    class="icon-button button-multiple-add"
+    @click="$emit('multipleAdd')"
+  >
+    <i :class="icons.add"></i>
+  </button>
 </div>
 </template>
 
@@ -231,12 +260,33 @@ export default {
   }
 }
 
+.button-multiple-add {
+  font-size: 80% !important;
+  height: 20px !important;
+  line-height: 20px !important;
+}
+
+.button-multiple-remove {
+  font-size: 80% !important;
+  height: 20px !important;
+  line-height: 20px !important;
+  width: 15px !important;
+  display: inline;
+  position: absolute;
+  top: 0px;
+}
 .slot-inputs {
   text-align: left;
   padding-left: 5px;
   padding-right: 15px;
   .connector {
     left: -9px;
+  }
+  .button-multiple-remove {
+    right: 0;
+  }
+  &.slot-multiple-removable {
+    // margin-right: 20px;
   }
 }
 
@@ -246,6 +296,9 @@ export default {
   padding-left: 15px;
   .connector {
     right: -9px;
+  }
+  .button-multiple-remove {
+    left: 0;
   }
 }
 

@@ -26,8 +26,8 @@ export default {
     */
     addSelectorChange () {
       if (this.addSelector === '') return
-      if (this.addSelector.startsWith('event/')) {
-        const [evv, mod, ev] = this.addSelector.split('/')
+      if (this.addSelector.startsWith('event::')) {
+        const [evv, mod, ev] = this.addSelector.split('::')
         this.$emit('addToLibrary', {
           name: '',
           type: evv,
@@ -37,8 +37,8 @@ export default {
         this.addSelector = ''
         return
       }
-      if (this.addSelector.startsWith('actor/')) {
-        const [act, aid, ev] = this.addSelector.split('/')
+      if (this.addSelector.startsWith('actor::')) {
+        const [act, aid, ev] = this.addSelector.split('::')
         if (act !== 'actor') {
           return
         }
@@ -102,7 +102,7 @@ export default {
         Object.values(mod.events || {}).forEach(event => {
           ret.push({
             label: event.name,
-            code: `event/${mod.code}/${event.code}`,
+            code: `event::${mod.code}::${event.code}`,
             enabled: true
           })
         })
@@ -111,7 +111,7 @@ export default {
         Object.values(actor.events || {}).forEach(event => {
           ret.push({
             label: actor.name + '::' + event.name,
-            code: `actor/${actor.id}/${event.code}`,
+            code: `actor::${actor.id}::${event.code}`,
             enabled: true
           })
         })
@@ -149,7 +149,7 @@ export default {
         </select>
       </div>
     </div>
-    <div class="panel-body">
+    <div class="panel-body panel-body-scrollable">
       <!-- classes -->
       <div
         v-for="cls of libraryClasses"

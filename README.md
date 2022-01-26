@@ -89,13 +89,21 @@ Options object used to configure editor icons and starting page, for example:
 
 # Documentation (under development)
 
+https://bluepjs.takatan.dev/
 https://bluepjs.readthedocs.io/en/latest/
+
+# Links
+
+https://github.com/bluep-js/vm
+https://github.com/bluep-js/vue3-ide
 
 # Roadmap
 
- Templated fields, dynamic inputs/outputs, classes and OOP support, libraries support (use/import/export)
+ Libraries support (use/import/export)
 
 # Local Development
+
+Project doesn't have any VM to get types/nodes/libraries/etc - you should care about it for local development.
 
 ## Project setup
 ```
@@ -106,8 +114,6 @@ npm install
 ```
 npm run serve
 ```
-
-Dowsn't have any VM to get types/nodes/libraries/etc
 
 ### Compiles and minifies for production
 ```

@@ -13,8 +13,9 @@ export default {
   },
   props: [
     'libraries',
+    'modules',
     'currentLibrary',
-    // 'fn',
+    'selected',
     'modelValue',
     'types',
     'layout',
@@ -40,16 +41,18 @@ export default {
     }
   },
   async created () {
-    // console.log('node created', this.node, this.fn)
     await waitFor(0)
-    const ro = new ResizeObserver(this.resizeUpdate)
-    ro.observe(this.$refs.graphNode)
+    if (this.$refs.graphNode) {
+      const ro = new ResizeObserver(this.resizeUpdate)
+      ro.observe(this.$refs.graphNode)
+    }
   },
   watch: {
     'node.inputs.of': {
       deep: true,
-      handler (next/*, prev*/) {
-        // console.log('next of', next, prev)
+      handler (next) {
+        // console.log('next of', next, this.node)
+        if (!next || this.node.code !== 'class/new' || next.type !== 'bluep/classselector') return
         // if (next && prev && next.value === prev.value) return
         Object.keys(this.node.inputs).forEach(incode => {
           if (incode === 'call' || incode === 'of') return
@@ -114,12 +117,84 @@ export default {
       if (el.nodeName === 'DIV' && ['node-body', 'slot', 'slot-inputs', 'slot-outputs'].includes(el.className)) {
         this.$emit('draggable', true)
       }
+    },
+    multipleSlots (mcode) {
+      const ret = {
+        inputs: {},
+        outputs: {}
+      }
+      Object.keys(this.node.inputs || {}).forEach(infield => {
+        if (this.node.inputs[infield].multiple === mcode && !infield.includes('_multiple_')) ret.inputs[infield] = jclone(this.node.inputs[infield])
+      })
+      Object.keys(this.node.outputs || {}).forEach(outfield => {
+        if (this.node.outputs[outfield].multiple === mcode && !outfield.includes('_multiple_')) ret.outputs[outfield] = jclone(this.node.outputs[outfield])
+      })
+      return ret
+    },
+    multiplyAdd (direction, code) {
+      // console.log('m+', direction, code, this.node[direction][code])
+      const mcode = this.node[direction][code].multiple
+      if (!mcode) return
+      const m = this.node.multiples[mcode]
+      const tpl = this.multipleSlots(mcode)
+      const now = new Date()
+      const subcode = `_multiple_${now.getTime()}`
+      Object.keys(tpl.inputs).forEach(incode => {
+        const dst = jclone(this.node.inputs[incode])
+        delete dst.connections
+        dst.code += subcode
+        dst.name = this.node.inputs[incode].name + ` <${m.value}>`
+        this.node.inputs[dst.code] = dst
+      })
+      Object.keys(tpl.outputs).forEach(outcode => {
+        const dst = jclone(this.node.outputs[outcode])
+        delete dst.connections
+        dst.code += subcode
+        dst.name = this.node.outputs[outcode].name + ` <${m.value}>`
+        this.node.outputs[dst.code] = dst
+      })
+      this.node.multiples[mcode].value++
+      this.$emit('update:modelValue', this.node)
+    },
+    multiplyRemove (direction, code) {
+      const codes = code.split('_multiple_')
+      const ce = `_multiple_${codes.pop()}`
+      const m = this.node[direction][code].multiple
+      // console.log('m-', direction, code, ce, m)
+      Object.keys(this.node.inputs || {}).forEach(incode => {
+        if (!incode.endsWith(ce)) return
+        if (Object.keys(this.node.inputs[incode].connections || {}).length) {
+          this.$emit('slotClear', {
+            node: this.node,
+            slot: {
+              direction: 'inputs',
+              code: incode
+            }
+          })
+        }
+        delete this.node.inputs[incode]
+      })
+      Object.keys(this.node.outputs || {}).forEach(outcode => {
+        if (!outcode.endsWith(ce)) return
+        if (Object.keys(this.node.outputs[outcode].connections || {}).length) {
+          this.$emit('slotClear', {
+            node: this.node,
+            slot: {
+              direction: 'outputs',
+              code: outcode
+            }
+          })
+        }
+        delete this.node.outputs[outcode]
+      })
+      this.node.multiples[m].value--
+      this.$emit('update:modelValue', this.node)
     }
   },
   computed: {
     nodeClass () {
       const typeClass = this.node.code.replaceAll('/', '-')
-      const high = this.highlighted ? ' node-highlighted ' : ' '
+      const high = this.highlighted || this.selected ? ' node-highlighted ' : ' '
       const valid = typeof this.node.valid === 'boolean'
         ? this.node.valid
           ? ' '
@@ -141,8 +216,6 @@ export default {
     },
     slotsRows () {
       const inputs = this.node.inputs ? Object.keys(this.node.inputs) : []
-      /**/
-      /**/
       const outputs = this.node.outputs ? Object.keys(this.node.outputs) : []
       const length = inputs.length > outputs.length ? inputs.length : outputs.length
       const ret = []
@@ -193,20 +266,22 @@ export default {
     </div>
   </div>
   <div class="node-body" @mousedown="mouseDown">
-      <div
-        v-if="node.type !=='execute'"
-        class="node-body-header"
-      >
-        <span v-if="node.type === 'modifier'">{{node.name}}</span>
+    <div
+      v-if="node.type !=='execute'"
+      class="node-body-header"
+      :title="node.name"
+    >
+    <span v-if="node.type === 'modifier' || node.type === 'getter'">{{node.name}}</span>
         <button
-          v-if="isDeleteable"
-          @click.stop.prevent="$emit('deleteMe')"
-          class="icon-button close-icon"
-        >
-          <i :class="icons.close"></i>
-        </button>
-      </div>
-      <div
+        v-if="isDeleteable"
+        @click.stop.prevent="$emit('deleteMe')"
+        class="icon-button close-icon"
+        :class="`close-icon-${node.type}`"
+      >
+        <i :class="icons.close"></i>
+      </button>
+    </div>
+    <div
       v-for="row, i of slotsRows"
       :key="i"
       :class="{ 'slots-row': !isOutputOnly && !isInputOnly }"
@@ -217,7 +292,9 @@ export default {
           :direction="'inputs'"
           :node="node"
           :types="types"
+          :icons="icons"
           :libraries="libraries"
+          :modules="modules"
           :currentLibrary="currentLibrary"
           :dragSlot="dragSlot"
           :nodeRect="boundingRect"
@@ -240,6 +317,8 @@ export default {
             node: node,
             nodeRect: boundingRect
           })"
+          @multipleAdd="multiplyAdd('inputs', row.input)"
+          @multipleRemove="multiplyRemove('inputs', row.input)"
         />
       </div>
       <div v-if="!isInputOnly" class="slot">
@@ -248,6 +327,7 @@ export default {
           :direction="'outputs'"
           :node="node"
           :types="types"
+          :icons="icons"
           :dragSlot="dragSlot"
           :nodeRect="boundingRect"
           v-model="node.outputs[row.output]"
@@ -269,6 +349,8 @@ export default {
             node: node,
             nodeRect: boundingRect
           })"
+          @multipleAdd="multiplyAdd('outputs', row.output)"
+          @multipleRemove="multiplyRemove('outputs', row.output)"
         />
       </div>
     </div>
@@ -285,16 +367,31 @@ export default {
   background-color: rgba($bgColor, 50%);
   border-radius: $panelPadding;
   font-size: $graphTextSize;
+  z-index: 10;
+
+  .close-icon-modifier, .close-icon-getter {
+    position: absolute;
+    top: -10px !important;
+    right: -10px !important;
+    left: auto !important;
+    width: 24px !important;
+    height: 24px !important;
+    font-size: 90% !important;
+    border-radius: 10px;
+    z-index: 8;
+  }
 
   &:hover, &.node-highlighted {
     box-shadow: 0px 0px 10px #aa0;
     .node-header {
       .close-icon {
         display: block;
+
       }
     }
     .node-body {
       .node-body-header {
+        display: block;
         .close-icon {
           display: block;
         }
@@ -312,15 +409,12 @@ export default {
 
     .close-icon {
       position: absolute;
-      top: 1px;;
+      top: 1px;
       right: 2px;
       display: none;
       cursor: pointer;
       width: 25px;
-
-      svg {
-        fill: #c33;
-      }
+      font-size: 90% !important;
     }
   }
 
@@ -332,6 +426,7 @@ export default {
 
     .node-body-header {
       position: absolute;
+      display: none;
       top: 0px;
       left: 0px;
       width: 100%;
