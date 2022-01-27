@@ -1,5 +1,5 @@
 <script>
-import { waitFor } from '@/utils'
+import { waitFor } from './utils'
 
 export default {
   props: [
