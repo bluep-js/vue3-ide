@@ -1,4 +1,6 @@
 <script>
+import { waitFor } from '@/utils'
+
 export default {
   props: [
     'types',
@@ -49,6 +51,10 @@ export default {
       states: {},
       search: ''
     }
+  },
+  async created () {
+    await waitFor(0)
+    this.$refs.search.focus()
   },
   computed: {
     filteredTree () {
@@ -104,12 +110,12 @@ export default {
 </script>
 
 <template>
-<div class="context-menu" :style="{
+<div class="context-menu" @wheel.stop :style="{
   top: posY + 'px',
   left: posX + 'px'
 }">
   <div class="caption">add node</div>
-  <input class="search" type="text" placeholder="search" v-model="search"/>
+  <input ref="search" class="search text-dark" type="text" placeholder="search" v-model="search"/>
   <div class="menu-inner">
     <div v-for="cat of Object.keys(filteredTree)" :key="cat">
       <button class="cat-button" @click.stop.prevent="toggleCat(cat)">

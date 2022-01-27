@@ -404,7 +404,7 @@ export default {
     font-weight: bold;
     border-top-right-radius: $panelPadding;
     border-top-left-radius: $panelPadding;
-    cursor: grab;
+    cursor: move;
     position: relative;
 
     .close-icon {
