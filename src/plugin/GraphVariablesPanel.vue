@@ -35,13 +35,14 @@ export default {
   computed: {
     confs () {
       const ret = []
-      // console.log('confs', this.fn)
       if (this.fn.type === 'function' && !this.fn.event) {
-        return [{
-          code: 'dashboard',
-          name: 'Dashboard',
-          type: 'basic/boolean'
-        }]
+        // collect function confiurations from modules
+        Object.values(this.modules || {}).forEach(mod => {
+          Object.values(mod.functionConfigs || {}).forEach(cfg => {
+            ret.push(cfg)
+          })
+        })
+        return ret
       }
       if (!this.fn.event?.info?.config) {
         return ret

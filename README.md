@@ -128,3 +128,12 @@ npm run lint
 ### PR
 
 Please, into `dev` branch
+
+# Changelog
+
+## 0.3.5
+
++ fixed context menu scroll/zoom
++ drag field on Alt key + left mouse
++ small ui improvements
++ simple functions configurations from modules 'functionConfigs' metadata object

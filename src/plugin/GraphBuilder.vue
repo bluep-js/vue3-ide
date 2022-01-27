@@ -57,7 +57,8 @@ export default {
       },
       dragSlot: null,
       selectedNodes: [],
-      selectorRect: null
+      selectorRect: null,
+      tool: 'select'
       /*
       selectedEdge: null,
       */
@@ -516,7 +517,6 @@ export default {
       this.contextMenu.show = true
     },
     mouseDown (e) {
-      // console.log(e.buttons)
       this.updateLastMouse(e)
       // only left mouse down
       if (e.buttons === 1) {
@@ -524,6 +524,10 @@ export default {
           // selectorRect
           this.contextMenu.show = false
           this.contextMenu.filter = ''
+          if (e.altKey) {
+            this.dragField = true
+            return
+          }
           this.selectedNodes = []
           if (!this.selectorRect) {
             this.selectorRect = {
@@ -683,7 +687,7 @@ export default {
 </script>
 
 <template>
-<div class="wrapper">
+<div class="wrapper" :class="{'wrapper-dnd': (!!dragField || !!dragNode) }">
   <div class="tools">
     <!--
     <div class="coords">
@@ -812,6 +816,10 @@ export default {
 .wrapper {
   height: 100%;
   position: relative;
+
+  &.wrapper-dnd {
+    cursor: move;
+  }
 }
 
 .tools {
