@@ -160,7 +160,7 @@ export default {
   padding: 5px;
   border-radius: 5px;
   color: $textColor;
-  z-index: 5;
+  z-index: 15;
   min-width: 150px;
   max-height: 300px;
   background-color: rgba($bgColor, 75%);

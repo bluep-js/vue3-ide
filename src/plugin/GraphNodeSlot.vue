@@ -99,13 +99,13 @@ export default {
         return slotTemplateAcceptType(template, tp)
       }
       if (this.realType.startsWith('bluep/class/') && tp.startsWith('bluep/class/')) {
-        const clss1 = this.realType.split('/')
-        const clss2 = tp.split('/')
-        const cls1 = clss1[2]
-        const cls2 = clss2[2]
+        // const clss1 = this.realType.split('/')
+        // const clss2 = tp.split('/')
+        const cls1 = this.realType.slice(12)
+        const cls2 = tp.slice(12)
         return this.direction === 'inputs'
-          ? classIsParentOfClass(cls1, cls2, this.libraries)
-          : classIsParentOfClass(cls2, cls1, this.libraries)
+          ? classIsParentOfClass(cls1, cls2, this.libraries, this.modules)
+          : classIsParentOfClass(cls2, cls1, this.libraries, this.modules)
       }
       return false
     }
