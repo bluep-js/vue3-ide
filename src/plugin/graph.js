@@ -159,7 +159,7 @@ export const classParents = (classCode, library, libraries, modules) => {
  */
 export const classIsParentOf = (classCode, classLibrary, childCode, childLibrary, libraries, modules) => {
   const parents = classParents(childCode, childLibrary, libraries, modules)
-  return parents.index && parents.index.includes(`library/${classLibrary}/${classCode}`)
+  return parents.index && (parents.index.includes(`library/${classLibrary}/${classCode}`) || parents.index.includes(`module/${classLibrary}/${classCode}`))
 }
 
 /**
@@ -176,6 +176,12 @@ export const classIsParentOfClass = (parentCode, childCode, libraries, modules) 
     if (Object.keys(libraries[libcode].classes || {}).includes(childCode)) libChild = libcode
     if (Object.keys(libraries[libcode].classes || {}).includes(parentCode)) libParent = libcode
   })
+  if (!libParent || !libChild) {
+    Object.keys(modules || {}).forEach(modcode => {
+      if (Object.keys(modules[modcode].classes || {}).includes(childCode)) libChild = modcode
+      if (Object.keys(modules[modcode].classes || {}).includes(parentCode)) libParent = modcode
+    })
+  }
   if (!libParent || !libChild) return false
   return classIsParentOf(parentCode, libParent, childCode, libChild, libraries, modules)
 }

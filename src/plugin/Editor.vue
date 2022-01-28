@@ -126,7 +126,19 @@ export default {
     'select'
   ],
   data () {
+    // mix actors metadata as 'actor' module classes
+    const mods = jclone(this.modules)
+    if (mods && mods.actor) {
+      if (!mods.actor.classes) mods.actor.classes = {}
+      Object.values(this.actors || {}).forEach(actor => {
+        const meta = jclone(actor._metadata)
+        meta.schema = { ...(meta.state || {}) }
+        delete meta.state
+        mods.actor.classes[meta.code] = meta
+      })
+    }
     return {
+      mods,
       libs: this.libraries,
       isSaved: true,
       currentLibrary: null,
@@ -217,6 +229,36 @@ export default {
         }
       },
       deep: true
+    },
+    actors: {
+      deep: true,
+      handler (next) {
+        if (this.mods && this.mods.actor) {
+          Object.values(next || {}).forEach(actor => {
+            const meta = jclone(actor._metadata)
+            if (this.mods.actor.classes[meta.code]) return
+            meta.schema = { ...(meta.state || {}) }
+            delete meta.state
+            this.mods.actor.classes[meta.code] = meta
+          })
+        }
+      }
+    },
+    modules: {
+      deep: true,
+      handler (next) {
+        const mods = jclone(next)
+        if (mods && mods.actor) {
+          if (!mods.actor.classes) mods.actor.classes = {}
+          Object.values(this.actors || {}).forEach(actor => {
+            const meta = jclone(actor._metadata)
+            meta.schema = { ...(meta.state || {}) }
+            delete meta.state
+            mods.actor.classes[meta.code] = meta
+          })
+        }
+        this.mods = mods
+      }
     }
   },
   computed: {
@@ -320,7 +362,7 @@ export default {
         })
 
         // modules enums
-        Object.values(this.modules || {}).forEach(m => {
+        Object.values(this.mods || {}).forEach(m => {
           Object.keys(m.enums || {}).forEach(eid => {
             const enm = m.enums[eid]
             const node = jclone(enumFunction)
@@ -396,7 +438,7 @@ export default {
       })
 
       // modules structs
-      Object.values(this.modules || {}).forEach(m => {
+      Object.values(this.mods || {}).forEach(m => {
         Object.keys(m.structs || {}).forEach(sid => {
           const sct = m.structs[sid]
 
@@ -455,7 +497,7 @@ export default {
         ret.push(node)
       }
       const classesList = Object.values(this.libraries[this.currentLibrary].classes || {})
-      Object.values(this.modules || {}).forEach(m => {
+      Object.values(this.mods || {}).forEach(m => {
         Object.values(m.classes || {}).forEach(cls => {
           cls.module = m.code
           classesList.push(cls)
@@ -471,9 +513,9 @@ export default {
       const classConstructor = this.nodes.find(node => node.code === 'class/Constructor')
       classesList.forEach(cls => {
         /* parents cast to class */
-        const parentsInfo = classParents(cls.code, cls.library || cls.module, this.libraries, this.modules)
+        const parentsInfo = classParents(cls.code, cls.library || cls.module, this.libraries, this.mods)
         const parentsList = [...parentsInfo.direct, ...parentsInfo.back]
-        const clsCombined = classCombined(cls.code, cls.library || cls.module, this.libraries, this.modules)
+        const clsCombined = classCombined(cls.code, cls.library || cls.module, this.libraries, this.mods)
         parentsList.forEach(prnt => {
           const node = jclone(classCastTo)
           node.addable = true
@@ -552,7 +594,7 @@ export default {
       // inside class constructor or method
       if (this.selectedElement && (this.selectedElement.type === 'constructor' || this.selectedElement.type === 'method')) {
         // overrides super methods
-        // const clsFull = classCombined(this.selectedElement.class, this.selectedElement.library, this.libraries, this.modules)
+        // const clsFull = classCombined(this.selectedElement.class, this.selectedElement.library, this.libraries, this.mods)
         const currentClass = this.libraries[this.selectedElement.library].classes[this.selectedElement.class]
         // console.log('cc', currentClass)
         Object.values(currentClass.extends || {}).forEach(ext => {
@@ -736,7 +778,7 @@ export default {
 
       /*
       let base = [...ret]
-      Object.values(this.modules || {}).forEach(m => {
+      Object.values(this.mods || {}).forEach(m => {
         if (!m.ide || !m.ide.nodes) {
           return
         }
@@ -816,7 +858,7 @@ export default {
 
       // modules types
       // let base = { ...ret }
-      Object.values(this.modules).forEach(m => {
+      Object.values(this.mods).forEach(m => {
         // module enums
         Object.values(m.enums || {})
           .forEach(enm => {
@@ -984,9 +1026,9 @@ export default {
         const now = new Date()
         callNode.id = `${callNode.code}_${now.getTime()}`
         // module event
-        if (info.type === 'event' && info.module && this.modules[info.module]) {
+        if (info.type === 'event' && info.module && this.mods[info.module]) {
           const eventCode = info.code
-          const eventInfo = this.modules[info.module].events[eventCode]
+          const eventInfo = this.mods[info.module].events[eventCode]
           data.event = { ...info, config: {}, info: jclone(eventInfo) }
           data.name = eventInfo.name
           Object.keys(eventInfo.outputs || {}).forEach(key => {
@@ -996,11 +1038,9 @@ export default {
           })
         }
         // actor event
-        console.log('add info', info)
         if (info.type === 'event' && info.actor && this.actors[info.actor]) {
           const eventCode = info.code
           const eventInfo = this.actors[info.actor].events[eventCode]
-          console.log('event info', eventInfo)
           data.event = { ...info, info: jclone(eventInfo) }
           data.name = this.actors[info.actor].name + ' ' + eventInfo.name
           Object.keys(eventInfo.outputs || {}).forEach(key => {
@@ -1311,7 +1351,6 @@ export default {
       Add function variable and select it
     */
     addClassFunctionVariable (path) {
-      console.log('add cfv', path)
       /**/
       if (!this.selectedElement || !(this.selectedElement.type === 'constructor' || this.selectedElement.type === 'method')) return
       // console.log('add cfv', path)
@@ -1465,7 +1504,7 @@ export default {
       <div class="left-bar-scroll">
         <LibraryContentPanel
           :libraries="libs"
-          :modules="modules"
+          :modules="mods"
           :actors="actors"
           :currentLibrary="currentLibrary"
           :selectedElement="selectedElement"
@@ -1482,7 +1521,7 @@ export default {
           :types="typesFull"
           :icons="options.icons"
           :libraries="libs"
-          :modules="modules"
+          :modules="mods"
           class="panel-50"
           @addVariable="addFunctionVariable"
           @editVariable="editFunctionVariable"
@@ -1498,7 +1537,7 @@ export default {
           :types="typesFull"
           :icons="options.icons"
           :libraries="libs"
-          :modules="modules"
+          :modules="mods"
           class="panel-50"
           @addVariable="addClassFunctionVariable"
           @editVariable="editClassFunctionVariable"
@@ -1517,7 +1556,7 @@ export default {
       />
       <GraphBuilder
         :libraries="libs"
-        :modules="modules"
+        :modules="mods"
         :types="typesFull"
         :nodes="nodesFull"
         :currentLibrary="currentLibrary"
@@ -1528,7 +1567,7 @@ export default {
       />
       <GraphBuilder
         :libraries="libs"
-        :modules="modules"
+        :modules="mods"
         :types="typesFull"
         :nodes="nodesFull"
         :currentLibrary="currentLibrary"
@@ -1557,7 +1596,7 @@ export default {
       />
       <ClassBuilder
         :libraries="libs"
-        :modules="modules"
+        :modules="mods"
         :nodes="nodes"
         :dialogs="dialogs"
         :types="typesFull"

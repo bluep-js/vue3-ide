@@ -131,6 +131,12 @@ Please, into `dev` branch
 
 # Changelog
 
+## 0.3.6
+
+ + Actor module now provides all actors metadata as module's classes;
+ + Context menu z-index fix;
+ + small bugfixes for correct actors classes inheritance;
+
 ## 0.3.5
 
 + fixed context menu scroll/zoom
