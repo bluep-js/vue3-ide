@@ -3,9 +3,11 @@ import { waitFor } from './utils.js'
 import { classCombined } from './graph.js'
 
 export default {
+  name: 'BluepJsValueWidget',
   props: [
     'libraries',
     'modules',
+    'actors',
     'currentLibrary',
     'types',
     'info',
@@ -17,13 +19,17 @@ export default {
     'readOnly',
     'inSlot',
     'inWidget',
-    'inPanel'
+    'inPanel',
+    'overclasses',
+    'addclasses',
+    'depth'
   ],
   emits: [
     'update:modelValue'
   ],
   data () {
-    const def = typeof this.modelValue === 'undefined' ? this.info.value : this.modelValue
+    let def = typeof this.modelValue === 'undefined' ? this.info.value : this.modelValue
+    if (this.info.type.startsWith('bluep/struct/') && !def) def = {}
     const list = this.info.isArray
       ? Array.isArray(def) ? def.map(x => !!x && typeof x.toString === 'function' ? x.toString() : '') : []
       : typeof def === 'undefined' || def === null ? '' : def.toString()
@@ -39,22 +45,45 @@ export default {
     }
   },
   computed: {
+    fieldDepth () {
+      if (typeof this.depth !== 'number') return 0
+      return this.depth
+    },
     widgetClasses () {
-      const ret = ['value-widget']
+      let ret = ['value-widget']
+      ret.push(`value-widget-depth-${this.fieldDepth}`)
       if (this.size) ret.push(`value-widget-${this.size}`)
       if (this.info.isArray) ret.push('value-widget-array')
       ret.push(`value-widget-${this.info.type.replaceAll('/', '-')}`)
-      return ret.join(' ')
+      if (this.addCls('widget')) ret.push(this.addCls('widget'))
+      const over = this.overCls('widget')
+      if (typeof over === 'string') ret = [this.overCls('widget'), `value-widget-depth-${this.fieldDepth}`]
+      return ret.join(' ').trim()
     },
     inf () {
       return JSON.stringify(this.info)
     },
+    /*
     isTextInput () {
       return ['basic/string', 'basic/number', 'basic/float'].includes(this.info.type)
     },
+    */
+    fieldStruct () {
+      const scode = this.info.type.slice(13)
+      if (this.libraries[this.currentLibrary].structs && this.libraries[this.currentLibrary].structs[scode]) {
+        return this.libraries[this.currentLibrary].structs[scode].schema
+      }
+      let module = null
+      Object.keys(this.modules || {}).forEach(m => {
+        if (this.modules[m].structs && this.modules[m].structs[scode]) module = m
+      })
+      if (!module) return {}
+      const ret = this.modules[module].structs[scode].schema
+      return ret
+    },
     enumValues () {
       const ecode = this.info.type.slice(11)
-      if (this.libraries[this.currentLibrary].enums[ecode]) {
+      if (this.libraries[this.currentLibrary].enums && this.libraries[this.currentLibrary].enums[ecode]) {
         return this.libraries[this.currentLibrary].enums[ecode].values
       }
       let module = null
@@ -91,7 +120,6 @@ export default {
             }
           })
         }
-        // console.log(cls)
         fns.forEach(f => {
           ret.push(f)
         })
@@ -101,8 +129,10 @@ export default {
   },
   methods: {
     updateValue (next) {
-      // console.log('upd', next)
       if (this.info.type === 'basic/string') {
+        this.val = next.target.value
+      }
+      if (this.info.type === 'basic/color') {
         this.val = next.target.value
       }
       if (this.info.type === 'basic/number') {
@@ -135,6 +165,9 @@ export default {
       if (this.info.type === 'basic/string') {
         nextVal = next.target.value
       }
+      if (this.info.type === 'basic/color') {
+        nextVal = next.target.value
+      }
       if (this.info.type === 'basic/number') {
         nextVal = parseInt(next.target.value)
       }
@@ -165,6 +198,16 @@ export default {
           : nextVal.toString()
       }
     },
+    updateStructValue (fcode, next) {
+      if (!this.val) this.val = {}
+      this.val[fcode] = next
+      this.$emit('update:modelValue', this.val)
+    },
+    updateStructValueI (i, fcode, next) {
+      if (!this.val[i]) this.val[i] = {}
+      this.val[i][fcode] = next
+      this.$emit('update:modelValue', this.val)
+    },
     pushArray () {
       if (!this.val || !Array.isArray(this.val)) {
         this.val = []
@@ -180,8 +223,36 @@ export default {
       this.val = this.val.filter((x, i) => i !== index)
       if (this.info.list) this.listVal = this.listVal.filter((x, i) => i !== index)
       this.$emit('update:modelValue', this.val)
+    },
+    addCls (code) {
+      if (this.addclasses && typeof this.addclasses[code] === 'string') return this.addclasses[code]
+      return null
+    },
+    overCls (code) {
+      if (this.overclasses && typeof this.overclasses[code] === 'string') return this.overclasses[code]
+      return null
+    },
+    inputClasses (initial = '', type) {
+      let ret = initial.split(' ')
+      if (this.inSlot) ret.push('in-slot')
+      if (this.inPanel) {
+        ret.push('panel-input')
+        ret.push('text-dark')
+      }
+      if (!this.inSlot && !this.inPanel) ret.push('bg-white')
+      const cc = `input-${type}`
+      if (this.addCls(cc)) ret.push(this.addCls(cc))
+      const over = this.overCls(cc)
+      if (typeof over === 'string') ret = [this.overCls(cc)]
+      return ret.join(' ').trim()
+    },
+    elementClasses (initial = '', cc) {
+      let list = initial.split(' ')
+      list.push(this.addCls(cc) || '')
+      const over = this.overCls(cc)
+      if (typeof over === 'string') list = [over]
+      return list.join(' ').trim()
     }
-
   },
   watch: {
     modelValue: {
@@ -195,17 +266,21 @@ export default {
     }
   }
 }
+/*
+
+*/
 </script>
 
 <template>
 <div :class="widgetClasses" v-if="!info.isArray">
-  <div v-if="labeled" class="value-widget-label">
-    <label>{{info.name}}</label>
+  <div v-if="labeled" :class="elementClasses('value-widget-label', 'labeledContainer')">
+    <label :class="elementClasses('', 'labeledLabel')">{{info.name}}</label>
   </div>
-  <div class="value-widget-input">
+  <div :class="elementClasses('value-widget-input', 'widgetContainer')">
     <select
       v-if="info.list"
       class="form-select"
+      :class="inputClasses('', 'select')"
       v-model="listVal"
       @change="updateValue"
     >
@@ -214,7 +289,7 @@ export default {
     <input
       v-if="!info.list && info.type === 'basic/string'"
       type="text"
-      :class="{'in-slot': inSlot, 'bg-white': !inSlot && !inPanel, 'panel-input text-dark': inPanel}"
+      :class="inputClasses('', 'string')"
       :value="val"
       :placeholder="info.name"
       :disabled="!!disabled"
@@ -224,7 +299,7 @@ export default {
     <input
       v-if="!info.list && info.type === 'basic/number'"
       type="number"
-      :class="{'in-slot': inSlot, 'bg-white': !inSlot && !inPanel, 'panel-input text-dark': inPanel}"
+      :class="inputClasses('', 'number')"
       :value="val"
       :placeholder="info.name"
       :disabled="!!disabled"
@@ -235,7 +310,7 @@ export default {
       v-if="!info.list && info.type === 'basic/float'"
       type="number"
       step="any"
-      :class="{'in-slot': inSlot, 'bg-white': !inSlot && !inPanel, 'panel-input text-dark': inPanel}"
+      :class="inputClasses('', 'float')"
       :value="val"
       :placeholder="info.name"
       :disabled="!!disabled"
@@ -243,9 +318,18 @@ export default {
       @input="updateValue"
     />
     <input
+      v-if="!info.list && info.type === 'basic/color'"
+      type="color"
+      :class="inputClasses('', 'color')"
+      :value="val"
+      :disabled="!!disabled"
+      :readonly="!!readOnly"
+      @input="updateValue"
+    />
+    <input
       v-if="!info.list && info.type === 'basic/datetime'"
       type="datetime-local"
-      :class="{'in-slot': inSlot, 'bg-white': !inSlot && !inPanel, 'panel-input text-dark': inPanel}"
+      :class="inputClasses('', 'datetime')"
       :value="val"
       :placeholder="info.name"
       :disabled="!!disabled"
@@ -255,7 +339,7 @@ export default {
     <input
       v-if="!info.list && info.type === 'basic/date'"
       type="date"
-      :class="{'in-slot': inSlot, 'bg-white': !inSlot && !inPanel, 'panel-input text-dark': inPanel}"
+      :class="inputClasses('', 'date')"
       :value="val"
       :placeholder="info.name"
       :disabled="!!disabled"
@@ -265,7 +349,7 @@ export default {
     <input
       v-if="!info.list && info.type === 'basic/time'"
       type="time"
-      :class="{'in-slot': inSlot, 'bg-white': !inSlot && !inPanel, 'panel-input text-dark': inPanel}"
+      :class="inputClasses('', 'time')"
       :value="val"
       :placeholder="info.name"
       :disabled="!!disabled"
@@ -275,7 +359,7 @@ export default {
     <input
       v-if="!info.list && info.type === 'basic/boolean' && (inSlot || !inWidget)"
       type="checkbox"
-      :class="{'in-slot': inSlot, 'bg-white': !inSlot}"
+      :class="inputClasses('', 'checkbox')"
       :checked="!!val"
       :disabled="!!disabled"
       :readonly="!!readOnly"
@@ -283,8 +367,8 @@ export default {
     />
     <select
       v-if="!info.list && info.type.startsWith('bluep/enum') && (inSlot || !inWidget || inPanel)"
-      :class="{'in-slot': inSlot, 'bg-white': !inSlot && !inPanel, 'panel-input text-dark': inPanel}"
       @change="updateValue"
+      :class="inputClasses('', 'select')"
       v-model="val"
     >
       <option
@@ -296,7 +380,7 @@ export default {
     </select>
     <select
       v-if="!info.list && info.type === 'bluep/classselector' && (inSlot || !inWidget || inPanel)"
-      :class="{'in-slot': inSlot, 'bg-white': !inSlot && !inPanel, 'panel-input text-dark': inPanel}"
+      :class="inputClasses('', 'select')"
       @change="updateValue"
       v-model="val"
     >
@@ -307,22 +391,46 @@ export default {
         :selected="opt.value === val"
       >{{opt.label}}</option>
     </select>
+    <div v-if="!info.list && info.type.startsWith('bluep/struct') && (inSlot || !inWidget || inPanel)" :class="elementClasses('', 'structWrapper')">
+      <div v-for="fld of Object.values(fieldStruct)" :key="fld.code" :class="elementClasses('', 'struct-field')">
+        <BluepJsValueWidget
+          :libraries="libraries"
+          :modules="modules"
+          :currentLibrary="currentLibrary"
+          :icons="icons"
+          :types="types"
+          :info="fld"
+          :inPanel="inPanel"
+          :size="size"
+          :modelValue="val[fld.code]"
+          :labeled="labeled"
+          :disabled="disabled"
+          :readOnly="readOnly"
+          :inSlot="inSlot"
+          :inWidget="inWidget"
+          :overclasses="overclasses"
+          :addclasses="addclasses"
+          :depth="fieldDepth + 1"
+          @update:modelValue="updateStructValue(fld.code, $event)"
+        />
+      </div>
+    </div>
   </div>
 </div>
 
-<div class="value-widget-array-wrapper" v-else>
-  <div class="value-widget-array-item" v-for="sval, si of (val || [])" :key="si">
+<div :class="elementClasses('value-widget-array-wrapper', 'widgetArray')" v-else>
+  <div :class="elementClasses('value-widget-array-item', 'arrayItem')" v-for="sval, si of (val || [])" :key="si">
     <div :class="widgetClasses">
-      <button @click="remArray(si)" class="icon-button button-small value-widget-array-remove-button">
+      <button @click="remArray(si)" :class="elementClasses('icon-button button-small value-widget-array-remove-button', 'buttonArrayRemove')">
         <i :class="icons.remove"></i>
       </button>
-      <div v-if="labeled" class="value-widget-label">
-        <label>{{info.name}}</label>
+      <div v-if="labeled" :class="elementClasses('value-widget-label', 'labeledContainer')">
+        <label :class="elementClasses('', 'labeledLabel')">{{info.name}}</label>
       </div>
-      <div class="value-widget-input">
+      <div :class="elementClasses('value-widget-input', 'widgetContainer')">
         <select
           v-if="info.list"
-          class="form-select"
+          :class="inputClasses('', 'select')"
           v-model="listVal[si]"
           @change="updateValueI($event, si)"
         >
@@ -331,7 +439,7 @@ export default {
         <input
           v-if="!info.list && info.type === 'basic/string'"
           type="text"
-          :class="{'in-slot': inSlot, 'bg-white': !inSlot && !inPanel, 'panel-input text-dark': inPanel}"
+          :class="inputClasses('', 'string')"
           :value="val[si]"
           :placeholder="info.name"
           :disabled="!!disabled"
@@ -341,7 +449,7 @@ export default {
         <input
           v-if="!info.list && info.type === 'basic/number'"
           type="number"
-          :class="{'in-slot': inSlot, 'bg-white': !inSlot && !inPanel, 'panel-input text-dark': inPanel}"
+          :class="inputClasses('', 'number')"
           :value="val[si]"
           :placeholder="info.name"
           :disabled="!!disabled"
@@ -352,7 +460,7 @@ export default {
           v-if="!info.list && info.type === 'basic/float'"
           type="number"
           step="any"
-          :class="{'in-slot': inSlot, 'bg-white': !inSlot && !inPanel, 'panel-input text-dark': inPanel}"
+          :class="inputClasses('', 'float')"
           :value="val[si]"
           :placeholder="info.name"
           :disabled="!!disabled"
@@ -360,9 +468,18 @@ export default {
           @input="updateValueI($event, si)"
         />
         <input
+          v-if="!info.list && info.type === 'basic/color'"
+          type="color"
+          :class="inputClasses('', 'color')"
+          :value="val[si]"
+          :disabled="!!disabled"
+          :readonly="!!readOnly"
+          @input="updateValueI($event, si)"
+        />
+        <input
           v-if="!info.list && info.type === 'basic/datetime'"
           type="datetime-local"
-          :class="{'in-slot': inSlot, 'bg-white': !inSlot && !inPanel, 'panel-input text-dark': inPanel}"
+          :class="inputClasses('', 'datetime')"
           :value="val[si]"
           :placeholder="info.name"
           :disabled="!!disabled"
@@ -372,7 +489,7 @@ export default {
         <input
           v-if="!info.list && info.type === 'basic/date'"
           type="date"
-          :class="{'in-slot': inSlot, 'bg-white': !inSlot && !inPanel, 'panel-input text-dark': inPanel}"
+          :class="inputClasses('', 'date')"
           :value="val[si]"
           :placeholder="info.name"
           :disabled="!!disabled"
@@ -382,7 +499,7 @@ export default {
         <input
           v-if="!info.list && info.type === 'basic/time'"
           type="time"
-          :class="{'in-slot': inSlot, 'bg-white': !inSlot && !inPanel, 'panel-input text-dark': inPanel}"
+          :class="inputClasses('', 'time')"
           :value="val[si]"
           :placeholder="info.name"
           :disabled="!!disabled"
@@ -392,7 +509,7 @@ export default {
         <input
           v-if="!info.list && info.type === 'basic/boolean' && (inSlot || !inWidget)"
           type="checkbox"
-          :class="{'in-slot': inSlot, 'bg-white': !inSlot}"
+          :class="inputClasses('', 'checkbox')"
           :checked="!!val[si]"
           :disabled="!!disabled"
           :readonly="!!readOnly"
@@ -400,7 +517,7 @@ export default {
         />
         <select
           v-if="!info.list && info.type.startsWith('bluep/enum') && (inSlot || !inWidget || inPanel)"
-          :class="{'in-slot': inSlot, 'bg-white': !inSlot && !inPanel, 'panel-input text-dark': inPanel}"
+          :class="inputClasses('', 'select')"
           @change="updateValueI($event, si)"
           v-model="val[si]"
         >
@@ -413,7 +530,7 @@ export default {
         </select>
         <select
           v-if="!info.list && info.type === 'bluep/classselector' && (inSlot || !inWidget || inPanel)"
-          :class="{'in-slot': inSlot, 'bg-white': !inSlot && !inPanel, 'panel-input text-dark': inPanel}"
+          :class="inputClasses('', 'select')"
           @change="updateValueI($event, si)"
           v-model="val[si]"
         >
@@ -424,12 +541,36 @@ export default {
             :selected="opt.value === val"
           >{{opt.label}}</option>
         </select>
+        <div v-if="!info.list && info.type.startsWith('bluep/struct') && (inSlot || !inWidget || inPanel)" :class="elementClasses('', 'structWrapper')">
+          <div v-for="fld of Object.values(fieldStruct)" :key="fld.code" :class="elementClasses('', 'struct-field')">
+            <BluepJsValueWidget
+              :libraries="libraries"
+              :modules="modules"
+              :currentLibrary="currentLibrary"
+              :icons="icons"
+              :types="types"
+              :info="fld"
+              :inPanel="inPanel"
+              :size="size"
+              :modelValue="val[si][fld.code]"
+              :labeled="labeled"
+              :disabled="disabled"
+              :readOnly="readOnly"
+              :inSlot="inSlot"
+              :inWidget="inWidget"
+              :overclasses="overclasses"
+              :addclasses="addclasses"
+              :depth="fieldDepth + 1"
+              @update:modelValue="updateStructValueI(si, fld.code, $event)"
+            />
+          </div>
+        </div>
       </div>
     </div>
 
   </div>
-  <div class="value-widget-array-push-button-item">
-    <button @click="pushArray" class="icon-button button-small value-widget-array-push-button">
+  <div :class="elementClasses('value-widget-array-push-button-item', 'buttonArrayAddContainer') ">
+    <button @click="pushArray" :class="elementClasses('icon-button button-small value-widget-array-push-button', 'buttonArrayAdd')">
       <i :class="icons.add"></i>
     </button>
   </div>
@@ -450,6 +591,7 @@ export default {
   background: #fff;
   line-height: $graphTextSize + 6;
   height: $graphTextSize + 6;
+  min-width: $graphTextSize + 6;
   margin-bottom: 0;
   padding: 0px 2px;
 

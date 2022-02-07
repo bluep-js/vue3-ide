@@ -108,6 +108,7 @@ input.panel-input {
   color: $textColor;
   font-size: $panelTextSize * 0.8;
   height: $panelTextSize !important;
+  min-width: $panelTextSize !important;
   line-height: $panelTextSize !important;
   padding-left: $panelPadding;
   width: 100%;

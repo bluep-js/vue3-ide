@@ -1,5 +1,7 @@
 <script>
 
+import { actorCombined } from './graph'
+
 export default {
   props: [
     'libraries',
@@ -108,7 +110,8 @@ export default {
         })
       })
       Object.values(this.actors || {}).forEach(actor => {
-        Object.values(actor.events || {}).forEach(event => {
+        const cmb = actorCombined(actor.id, this.actors, this.modules)
+        Object.values(cmb.events || {}).forEach(event => {
           ret.push({
             label: actor.name + '::' + event.name,
             code: `actor::${actor.id}::${event.code}`,

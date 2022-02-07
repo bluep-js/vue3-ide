@@ -1,6 +1,6 @@
 {
   "name": "@bluepjs/vue3-ide",
-  "version": "0.3.6",
+  "version": "0.3.7",
   "description": "IDE for @bluepjs blueprints",
   "main": "./dist/editor.common.js",
   "module": "./dist/editor.umd.min.js",
@@ -14,7 +14,7 @@
   },
   "keywords": ["bluepjs","ide","blueprint","editor"],
   "author": "Evgeny Trifonov <abrakadobr@gmail.com>",
-  "homepage": "https://github.com/bluep-js/vue3-ide#readme",
+  "homepage": "https://bluepjs.takatan.dev",
   "repository": {
     "type": "git",
     "url": "https://github.com/bluep-js/vue3-ide"

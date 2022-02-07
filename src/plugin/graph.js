@@ -268,3 +268,42 @@ export const classCombined = (code, library, libraries, modules) => {
   })
   return cls
 }
+
+export const actorParents = (src, actors, modules) => {
+  // console.log('rap', src, modules)
+  const act = src.id
+    ? actors[src.id]
+    : modules[src.module].classes[src.code]
+  const parents = []
+  const index = []
+  if (!act) return parents
+  Object.values(act.extends || {}).forEach(ext => {
+    const prnt = modules[ext.module].classes[ext.code]
+    if (index.includes(`${ext.module}/${ext.code}`)) return
+    index.push(`${ext.module}/${ext.code}`)
+    parents.push({ ...prnt, module: ext.module })
+    const prntParents = actorParents(ext, actors, modules)
+    prntParents.forEach(pp => {
+      if (index.includes(`${pp.module}/${pp.code}`)) return
+      index.push(`${pp.module}/${pp.code}`)
+      parents.push(pp)
+    })
+  })
+  return parents
+}
+
+export const actorCombined = (aid, actors, modules) => {
+  if (!actors || !modules || !actors[aid]) return null
+  const act = actors[aid]
+  if (!act) return null
+  // const ret = actors[aid]
+  const info = jclone(act)
+  const parents = actorParents({ id: aid }, actors, modules)
+  parents.forEach(prnt => {
+    info.schema = { ...(info.schema || {}), ...(prnt.schema || {}) }
+    info.methods = { ...(info.methods || {}), ...(prnt.methods || {}) }
+    info.events = { ...(info.events || {}), ...(prnt.events || {}) }
+  })
+  info._parents = parents
+  return info
+}

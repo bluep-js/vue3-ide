@@ -13,7 +13,7 @@ import StructBuilder from './StructBuilder.vue'
 import ClassBuilder from './ClassBuilder.vue'
 
 import { jclone, waitFor } from './utils.js'
-import { classParents, classCombined } from './graph.js'
+import { classParents, classCombined, actorCombined } from './graph.js'
 
 const defaultIcons = {
   enum: 'fas fa-list-ol',
@@ -131,9 +131,7 @@ export default {
     if (mods && mods.actor) {
       if (!mods.actor.classes) mods.actor.classes = {}
       Object.values(this.actors || {}).forEach(actor => {
-        const meta = jclone(actor._metadata)
-        meta.schema = { ...(meta.state || {}) }
-        delete meta.state
+        const meta = this._actor2class(actor)
         mods.actor.classes[meta.code] = meta
       })
     }
@@ -235,10 +233,8 @@ export default {
       handler (next) {
         if (this.mods && this.mods.actor) {
           Object.values(next || {}).forEach(actor => {
-            const meta = jclone(actor._metadata)
-            if (this.mods.actor.classes[meta.code]) return
-            meta.schema = { ...(meta.state || {}) }
-            delete meta.state
+            // if (this.mods.actor.classes[actor._metadata.code]) return
+            const meta = this._actor2class(actor)
             this.mods.actor.classes[meta.code] = meta
           })
         }
@@ -251,9 +247,8 @@ export default {
         if (mods && mods.actor) {
           if (!mods.actor.classes) mods.actor.classes = {}
           Object.values(this.actors || {}).forEach(actor => {
-            const meta = jclone(actor._metadata)
-            meta.schema = { ...(meta.state || {}) }
-            delete meta.state
+            // if (this.mods.actor.classes[actor._metadata.code]) return
+            const meta = this._actor2class(actor)
             mods.actor.classes[meta.code] = meta
           })
         }
@@ -1040,7 +1035,8 @@ export default {
         // actor event
         if (info.type === 'event' && info.actor && this.actors[info.actor]) {
           const eventCode = info.code
-          const eventInfo = this.actors[info.actor].events[eventCode]
+          const cmb = actorCombined(info.actor, this.actors, this.mods)
+          const eventInfo = cmb.events[eventCode]
           data.event = { ...info, info: jclone(eventInfo) }
           data.name = this.actors[info.actor].name + ' ' + eventInfo.name
           Object.keys(eventInfo.outputs || {}).forEach(key => {
@@ -1475,6 +1471,30 @@ export default {
       this.libs[this.selectedElement.library].classes[this.selectedElement.class].methods[this.selectedElement.code].name = next
       this.isSaved = false
       /**/
+    },
+
+    // =============================================
+
+    //                    utils
+
+    // =============================================
+    _actor2class (actor) {
+      const meta = jclone(actor._metadata)
+      meta.schema = { ...(meta.state || {}) }
+      delete meta.state
+      Object.keys(meta.schema).forEach(fcode => {
+        meta.schema[fcode].access = 'public'
+        meta.schema[fcode].readonly = true
+      })
+      Object.keys(meta.methods || {}).forEach(mcode => {
+        meta.methods[mcode].access = 'public'
+        meta.methods[mcode].type = 'method'
+        meta.methods[mcode].context = {
+          inputs: { ...(meta.methods[mcode].inputs || {}) },
+          outputs: { ...(meta.methods[mcode].outputs || {}) }
+        }
+      })
+      return meta
     }
   }
 }
@@ -1522,6 +1542,7 @@ export default {
           :icons="options.icons"
           :libraries="libs"
           :modules="mods"
+          :actors="actors"
           class="panel-50"
           @addVariable="addFunctionVariable"
           @editVariable="editFunctionVariable"
@@ -1538,6 +1559,7 @@ export default {
           :icons="options.icons"
           :libraries="libs"
           :modules="mods"
+          :actors="actors"
           class="panel-50"
           @addVariable="addClassFunctionVariable"
           @editVariable="editClassFunctionVariable"
@@ -1618,6 +1640,8 @@ export default {
       <GraphVariablePanel
         v-if="selectedVariable && selectedElement.type === 'function'"
         :libraries="libs"
+        :modules="mods"
+        :actors="actors"
         :currentLibrary="currentLibrary"
         :variable="selectedVariable.variable"
         :context="libs[selectedElement.library].functions[selectedElement.code].context"
@@ -1631,6 +1655,8 @@ export default {
       <GraphVariablePanel
         v-if="selectedVariable && (selectedElement.type === 'method' || selectedElement.type === 'constructor')"
         :libraries="libs"
+        :modules="mods"
+        :actors="actors"
         :currentLibrary="currentLibrary"
         :variable="selectedVariable.variable"
         :context="libs[selectedElement.library].classes[selectedElement.class].methods[selectedElement.code].context"

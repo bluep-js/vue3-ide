@@ -13,6 +13,7 @@ export default {
     'icons',
     'libraries',
     'modules',
+    'actors',
     'currentLibrary',
     'direction',
     'dragSlot',
@@ -215,6 +216,7 @@ export default {
     :icons="icons"
     :libraries="libraries"
     :modules="modules"
+    :actors="actors"
     :currentLibrary="currentLibrary"
     @update:modelValue="updateSlot"
   />
