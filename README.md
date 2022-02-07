@@ -17,6 +17,8 @@ import bluep from '@bluepjs/vue3-ide'
 // ...
 createApp(app)
   .use(bluep)
+  // to redefine default components names
+  // .use(bluep, { component: 'BluepJsEditor', valueWidget: 'BluepJsValueWidget' })
 // ...
 ```
 
@@ -80,6 +82,7 @@ Options object used to configure editor icons and starting page, for example:
 
  - `icons` - used "i class" style. Without icons some buttons right now are not visible (has no text, will be fixed in future)
  - `select` - object recieved on `@select` event to start editor with required element open
+ - check other options at https://bluepjs.takatan.dev/dev/ide.html#options
 
 ### Events
 
@@ -90,7 +93,6 @@ Options object used to configure editor icons and starting page, for example:
 # Documentation (under development)
 
 https://bluepjs.takatan.dev/
-https://bluepjs.readthedocs.io/en/latest/
 
 # Links
 
@@ -130,6 +132,13 @@ npm run lint
 Please, into `dev` branch
 
 # Changelog
+
+## 0.3.7
+
+ + actors classes optimization
+ + ValueWidget supports: bluep/struct/.., basic/color, addclasses and overclasses for html classes control
+ + ValueWidget component now also registered on module install with default name `BluepJsValueWidget`
+ - ValueWidget is not documented
 
 ## 0.3.6
 

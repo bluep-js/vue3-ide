@@ -15,6 +15,7 @@ export default {
     'cls',
     'libraries',
     'modules',
+    'actors',
     'types',
     'icons',
     'isMethod'
@@ -106,6 +107,10 @@ export default {
           v-model="config[cfg.code]"
           :inPanel="true"
           :icons="icons"
+          :libraries="libraries"
+          :modules="modules"
+          :actors="actors"
+          :types="actors"
           @update:modelValue="$emit('updateConfig', config)"
         />
       </div>

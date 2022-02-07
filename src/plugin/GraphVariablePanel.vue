@@ -12,6 +12,8 @@ export default {
   },
   props: [
     'libraries',
+    'modules',
+    'actors',
     'currentLibrary',
     'variable',
     'types',
@@ -188,6 +190,8 @@ export default {
               <ValueWidget
                 v-model="vr.value"
                 :libraries="libraries"
+                :modules="modules"
+                :actors="actors"
                 :currentLibrary="currentLibrary"
                 :icons="icons"
                 :types="types"
