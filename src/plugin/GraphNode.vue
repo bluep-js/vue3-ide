@@ -112,9 +112,12 @@ export default {
       this.$emit('draggable', next)
     },
     mouseDown (e) {
-      // console.log(e.path)
-      const el = e.path[1]
-      if (el.nodeName === 'DIV' && ['node-body', 'slot', 'slot-inputs', 'slot-outputs'].includes(el.className)) {
+      let target = e.target
+      if (typeof e.composedPath === 'function') {
+        const paths = e.composedPath()
+        target = paths[1]
+      }
+      if (target.nodeName === 'DIV' && ['node-body', 'slot', 'slot-inputs', 'slot-outputs'].includes(target.className)) {
         this.$emit('draggable', true)
       }
     },
