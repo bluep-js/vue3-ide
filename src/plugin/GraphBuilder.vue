@@ -423,13 +423,19 @@ export default {
       this.lastMouse.lx = e.layerX
       this.lastMouse.ly = e.layerY
       this.lastMouse.delta = delta
-      if (e.path[0].nodeName === 'svg' && e.path[0].className.baseVal === 'field-svg') {
+      if (this.isFieldEvent(e)) {
         this.lastMouse.paperX = this.lastMouse.ox
         this.lastMouse.paperY = this.lastMouse.oy
       } else {
         this.lastMouse.paperX += delta.x
         this.lastMouse.paperY += delta.y
       }
+    },
+    isFieldEvent (e) {
+      const target = e.path
+        ? e.path[0]
+        : e.target
+      return target.nodeName === 'svg' && target.className.baseVal === 'field-svg'
     },
     /**/
     mouseMove (e) {
@@ -520,7 +526,7 @@ export default {
       this.updateLastMouse(e)
       // only left mouse down
       if (e.buttons === 1) {
-        if (e.path[0].nodeName === 'svg' && e.path[0].className.baseVal === 'field-svg') {
+        if (this.isFieldEvent(e)) {
           // selectorRect
           this.contextMenu.show = false
           this.contextMenu.filter = ''
@@ -542,7 +548,7 @@ export default {
       // only middle mouse down
       if (e.buttons === 4) {
         // field drag on middle mouse
-        if (e.path[0].nodeName === 'svg' && e.path[0].className.baseVal === 'field-svg') {
+        if (this.isFieldEvent(e)) {
           this.contextMenu.show = false
           this.contextMenu.filter = ''
           this.dragField = true
@@ -566,6 +572,7 @@ export default {
     },
     mouseWheel (e) {
       /**/
+      console.log(e)
       // this.updateLastMouse(e)
       if (this.layout.zoom.step !== 0.1) this.layout.zoom.step = 0.1
       if (this.layout.zoom.min !== 0.5) this.layout.zoom.min = 0.5
