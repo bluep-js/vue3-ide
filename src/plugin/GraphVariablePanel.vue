@@ -70,6 +70,22 @@ export default {
       this.undefineValue()
       this.$emit('typeChanged')
     },
+    isArraySwitched (e) {
+      if (e.target.checked) {
+        this.vr.isArray = 1
+      } else {
+        this.vr.isArray = 0
+      }
+      this.isArrayChanged()
+    },
+    canBeArraySwitched (e) {
+      if (e.target.checked) {
+        this.vr.canBeArray = true
+      } else {
+        this.vr.canBeArray = false
+      }
+      this.isArrayChanged()
+    },
     typeChanged () {
       this.undefineValue()
       this.$emit('typeChanged')
@@ -158,14 +174,36 @@ export default {
           </td>
         </tr>
         <tr>
-          <td>Array</td>
-          <td>
+          <td>Array <span v-if="vr.isArray > 0" class="ms-2">(depth)</span></td>
+          <td class="d-flex">
             <input
-              id="is-array"
+              id="is-array-switcher"
               type="checkbox"
-              v-model="vr.isArray"
+              :checked="vr.isArray > 0"
               class="panel-input"
+              @input="isArraySwitched"
+            />
+            <input
+              v-if="vr.isArray > 0"
+              id="is-array"
+              type="number"
+              min="0"
+              step="1"
+              v-model="vr.isArray"
+              class="panel-input text-dark ms-1"
               @input="isArrayChanged"
+            />
+          </td>
+        </tr>
+        <tr v-if="!vr.isArray">
+          <td>Can be array</td>
+          <td class="d-flex">
+            <input
+              id="can-be-array-switcher"
+              type="checkbox"
+              :checked="vr.canBeArray"
+              class="panel-input"
+              @input="canBeArraySwitched"
             />
           </td>
         </tr>
@@ -183,9 +221,12 @@ export default {
     <div class="panel-body">
       <div v-if="typeof vr.value === 'undefined'">Not defined</div>
       <div v-else>
-        <table>
-          <tr>
+        <table class="w-100">
+          <tr v-if="vr.isArray || vr.type.startsWith('bluep/struct')" class="no-wrap pr-5p">
             <td class="no-wrap pr-5p">{{vr.name}}</td>
+          </tr>
+          <tr>
+            <td v-if="!(vr.isArray || vr.type.startsWith('bluep/struct'))" class="no-wrap pr-5p">{{vr.name}}</td>
             <td>
               <ValueWidget
                 v-model="vr.value"

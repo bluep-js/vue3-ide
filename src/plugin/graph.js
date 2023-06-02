@@ -69,7 +69,7 @@ export const newFunction = ({ code, name, library, type = 'function' }, nodes) =
  */
 export const slotTemplateAcceptType = (template, type) => {
   if (typeof template.type === 'string') {
-    // console.log('type defined! ??', template, type)
+    console.log('type defined! ??', template, type)
     return template.type === type
   }
   let ret = !!template.allow || !!template.disallow
@@ -85,6 +85,77 @@ export const slotTemplateAcceptType = (template, type) => {
       return rx.test(type)
     })
   }
+  return ret
+}
+
+/**
+ *  Tests if slot accept other slot only by checking arrays existance and properties
+ *  @param {Object} slot - incoming slot ("other slot")
+ *  @param {Object} tslot - slot to test
+ *  @returns {boolean} test result
+ */
+export const slotAcceptSlotArray = (slot, oslot) => {
+  if (!slot.isArray) {
+    return slot.canBeArray
+      ? true
+      : !oslot.isArray
+  }
+  const sa = (slot.isArray === true)
+    ? 1
+    : typeof slot.isArray === 'number'
+      ? slot.isArray
+      : 0
+  const oa = (oslot.isArray === true)
+    ? 1
+    : typeof oslot.isArray === 'number'
+      ? oslot.isArray
+      : 0
+  if (!oa && oslot.canBeArray) return true
+  if (!oa && sa) return false
+  return oa <= sa
+}
+
+/**
+ *  Tests if templated slot accept other slot
+ *  @param {Object} slot - incoming slot ("other slot")
+ *  @param {Object} tslot - templated slot to test
+ *  @param {Object} template - template data
+ *  @returns {boolean} test result
+ */
+export const slotTemplateAcceptSlot = (slot, tslot, template) => {
+  if (!slotTemplateAcceptType(template, slot.type)) return false
+  return slotAcceptSlotArray(slot, tslot)
+}
+
+/**
+ *  Check and extract keys for slot template and variant (if required)
+ *  @param {Object} node - node owning slot and templates
+ *  @param {Object} slot - templated slot
+ *  @returns {{tkey: string | null, vkey: string | null}} object with template and variant keys
+ */
+export const slotTemplateKeys = (node, slot) => {
+  const ret = {
+    tkey: null,
+    vkey: null
+  }
+  if (slot.type !== 'basic/template') return ret
+  if (!node.templates) return ret
+  if (node.templates[slot.template]) {
+    ret.tkey = slot.template
+    return ret
+  }
+  if (typeof slot.template !== 'string') return ret
+  if (!slot.template.includes('/')) return ret
+  let vkey = null
+  const tpl = Object.keys(node.templates).find(tkey => {
+    const tpld = node.templates[tkey]
+    const vvkey = Object.keys(tpld.variants || {}).find(vky => slot.template === `${tkey}/${vky}`)
+    if (vvkey) vkey = vvkey
+    return !!vvkey
+  })
+  if (!tpl || !vkey) return ret
+  ret.tkey = tpl
+  ret.vkey = vkey
   return ret
 }
 
