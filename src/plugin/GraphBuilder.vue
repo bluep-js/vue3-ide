@@ -3,6 +3,7 @@ import GraphNode from './GraphNode.vue'
 import GraphEdge from './GraphEdge.vue'
 import ContextMenu from './ContextMenu.vue'
 
+import { slotTemplateKeys } from './graph.js'
 import { jclone } from './utils.js'
 
 export default {
@@ -55,10 +56,11 @@ export default {
         x: 0,
         y: 0
       },
+      snapToGrid: false,
       dragSlot: null,
       selectedNodes: [],
       selectorRect: null,
-      tool: 'select'
+      tool: 'cursor'
       /*
       selectedEdge: null,
       */
@@ -217,6 +219,9 @@ export default {
     resizeUpdate () {
       // console.log('resize update', this.$refs.field)
     },
+    clipboardAction (action) {
+      console.log('clipboard action', action)
+    },
     setDragNode (node, state) {
       this.dragNode = state ? node : null
     },
@@ -288,7 +293,7 @@ export default {
       this.emitUpdate()
     },
     slotDrag (info) {
-      if (!info) {
+      if (!info || this.tool !== 'cursor') {
         this.dragSlot = null
         return
       }
@@ -307,6 +312,11 @@ export default {
       const pointTo = info.slot.direction === 'inputs' ? dropPoint : this.dragSlot.from
       const edgeType = slotFrom.type === 'basic/template' ? slotTo.type : slotFrom.type
       const now = new Date()
+      if (slotTo.isArray) {
+        // console.log('TO ARRAY', slotTo)
+        pointFrom.y += 2
+        pointTo.y += 2
+      }
       const edge = {
         id: `edge_${now.getTime()}`,
         type: edgeType,
@@ -340,14 +350,40 @@ export default {
       this.graph.nodes[nodeTo.id].inputs[slotTo.code].connections[edge.id] = edge
 
       if (slotFrom.type === 'basic/template') {
-        this.graph.nodes[nodeFrom.id].templates[slotFrom.template].type = edgeType
+        this.slotSetTemplatedType(nodeFrom.id, 'outputs', slotFrom.code, slotTo)
       }
 
       if (slotTo.type === 'basic/template') {
-        this.graph.nodes[nodeTo.id].templates[slotTo.template].type = edgeType
+        this.slotSetTemplatedType(nodeTo.id, 'inputs', slotTo.code, slotFrom)
       }
 
       this.emitUpdate()
+    },
+
+    /* set templated slot type */
+    slotSetTemplatedType (nid, slotDirection, slotCode, dropSlot) {
+      const node = this.graph.nodes[nid]
+      if (!node) return
+      const slot = node[slotDirection][slotCode]
+      if (!slot || slot.type !== 'basic/template') return
+      const tpl = slotTemplateKeys(node, slot)
+      if (!tpl || !tpl.tkey || !node.templates[tpl.tkey]) return
+      const next = {
+        type: dropSlot.type,
+        isArray: dropSlot.isArray,
+        canBeArray: dropSlot.canBeArray
+      }
+      this.graph.nodes[nid].templates[tpl.tkey].value = next
+      if (!tpl.vkey || !node.templates[tpl.tkey].variants) return
+      const variant = node.templates[tpl.tkey].variants[tpl.vkey]
+      if (!variant) return
+      Object.keys(variant.info || {}).forEach(ikey => {
+        next[ikey] = variant.info[ikey]
+      })
+      Object.keys(variant.$add || {}).forEach(ikey => {
+        next[ikey] -= variant.$add[ikey]
+      })
+      this.graph.nodes[nid].templates[tpl.tkey].value = next
     },
 
     /* slot clear */
@@ -376,17 +412,19 @@ export default {
       if (this.graph.nodes[edge.from.node].outputs[edge.from.slot].connections) delete this.graph.nodes[edge.from.node].outputs[edge.from.slot].connections[eid]
       if (this.graph.nodes[edge.to.node].inputs[edge.to.slot].connections) delete this.graph.nodes[edge.to.node].inputs[edge.to.slot].connections[eid]
       if (this.graph.nodes[edge.from.node].outputs[edge.from.slot].type === 'basic/template') {
-        const ins = Object.values(this.graph.nodes[edge.from.node].inputs).some(slot => slot.template === this.graph.nodes[edge.from.node].outputs[edge.from.slot].template && Object.keys(slot.connections || {}).length)
-        const outs = Object.values(this.graph.nodes[edge.from.node].outputs).some(slot => slot.template === this.graph.nodes[edge.from.node].outputs[edge.from.slot].template && Object.keys(slot.connections || {}).length)
+        const keys = slotTemplateKeys(this.graph.nodes[edge.from.node], this.graph.nodes[edge.from.node].outputs[edge.from.slot])
+        const ins = Object.values(this.graph.nodes[edge.from.node].inputs).some(slot => (slot.template || '').startsWith(keys.tkey) && Object.keys(slot.connections || {}).length)
+        const outs = Object.values(this.graph.nodes[edge.from.node].outputs).some(slot => (slot.template || '').startsWith(keys.tkey) && Object.keys(slot.connections || {}).length)
         if (!ins && !outs) {
-          delete this.graph.nodes[edge.from.node].templates[this.graph.nodes[edge.from.node].outputs[edge.from.slot].template].type
+          if (keys.tkey) delete this.graph.nodes[edge.from.node].templates[keys.tkey].value
         }
       }
       if (this.graph.nodes[edge.to.node].inputs[edge.to.slot].type === 'basic/template') {
-        const ins = Object.values(this.graph.nodes[edge.to.node].inputs).some(slot => slot.template === this.graph.nodes[edge.to.node].inputs[edge.to.slot].template && Object.keys(slot.connections || {}).length)
-        const outs = Object.values(this.graph.nodes[edge.to.node].outputs).some(slot => slot.template === this.graph.nodes[edge.to.node].inputs[edge.to.slot].template && Object.keys(slot.connections || {}).length)
+        const keys = slotTemplateKeys(this.graph.nodes[edge.to.node], this.graph.nodes[edge.to.node].inputs[edge.to.slot])
+        const ins = Object.values(this.graph.nodes[edge.to.node].inputs).some(slot => (slot.template || '').startsWith(keys.tkey) && Object.keys(slot.connections || {}).length)
+        const outs = Object.values(this.graph.nodes[edge.to.node].outputs).some(slot => (slot.template || '').startsWith(keys.tkey) && Object.keys(slot.connections || {}).length)
         if (!ins && !outs) {
-          delete this.graph.nodes[edge.to.node].templates[this.graph.nodes[edge.to.node].inputs[edge.to.slot].template].type
+          if (keys.tkey) delete this.graph.nodes[edge.to.node].templates[keys.tkey].value
         }
       }
       delete this.layout.parts[eid]
@@ -423,6 +461,7 @@ export default {
       this.lastMouse.lx = e.layerX
       this.lastMouse.ly = e.layerY
       this.lastMouse.delta = delta
+      this.lastMouse.buttons = e.buttons
       if (this.isFieldEvent(e)) {
         this.lastMouse.paperX = this.lastMouse.ox
         this.lastMouse.paperY = this.lastMouse.oy
@@ -437,47 +476,56 @@ export default {
         : e.target
       return target.nodeName === 'svg' && target.className.baseVal === 'field-svg'
     },
+    movePaper (shift) {
+      // const dt = this.graphTop - this.layout.field.top
+      // const dl = this.layout.field.left - this.graphLeft
+      // console.log(dt)
+      // if (shift.y < 0 && dt > 1000) this.layout.field.top += shift.y
+      // const db = this.layout.field.height - this.graphBottom
+      // if (shift.y > 0 && db > 1000) this.layout.field.top += shift.y
+      this.layout.field.left += shift.x
+      this.layout.field.top += shift.y
+      if (this.layout.field.top > -50) {
+        this.layout.field.top -= 500
+        this.layout.field.height += 500
+        Object.keys(this.layout.parts).forEach(pid => {
+          if (pid.startsWith('edge')) {
+            this.layout.parts[pid].to.y += 500
+            this.layout.parts[pid].from.y += 500
+          } else {
+            this.layout.parts[pid].y += 500
+          }
+        })
+      }
+      if (this.layout.field.left > -50) {
+        this.layout.field.left -= 500
+        this.layout.field.width += 500
+        Object.keys(this.layout.parts).forEach(pid => {
+          if (pid.startsWith('edge')) {
+            this.layout.parts[pid].to.x += 500
+            this.layout.parts[pid].from.x += 500
+          } else {
+            this.layout.parts[pid].x += 500
+          }
+        })
+      }
+      const paperRect = this.$refs.paper.getBoundingClientRect()
+      if (this.layout.field.width + this.layout.field.left < paperRect.width - 100) {
+        this.layout.field.width += 500
+      }
+      if (this.layout.field.height + this.layout.field.top < paperRect.height - 100) {
+        this.layout.field.height += 500
+      }
+    },
     /**/
     mouseMove (e) {
       this.updateLastMouse(e)
       // field drag
       if (this.dragField) {
         e.preventDefault()
-        this.layout.field.top += this.lastMouse.delta.y
-        this.layout.field.left += this.lastMouse.delta.x
-        if (this.layout.field.top > -50) {
-          this.layout.field.top -= 500
-          this.layout.field.height += 500
-          Object.keys(this.layout.parts).forEach(pid => {
-            if (pid.startsWith('edge')) {
-              this.layout.parts[pid].to.y += 500
-              this.layout.parts[pid].from.y += 500
-            } else {
-              this.layout.parts[pid].y += 500
-            }
-          })
-        }
-        if (this.layout.field.left > -50) {
-          this.layout.field.left -= 500
-          this.layout.field.width += 500
-          Object.keys(this.layout.parts).forEach(pid => {
-            if (pid.startsWith('edge')) {
-              this.layout.parts[pid].to.x += 500
-              this.layout.parts[pid].from.x += 500
-            } else {
-              this.layout.parts[pid].x += 500
-            }
-          })
-        }
-        const paperRect = this.$refs.paper.getBoundingClientRect()
-        if (this.layout.field.width + this.layout.field.left < paperRect.width - 100) {
-          this.layout.field.width += 500
-        }
-        if (this.layout.field.height + this.layout.field.top < paperRect.height - 100) {
-          this.layout.field.height += 500
-        }
+        this.movePaper(this.lastMouse.delta)
         this.emitUpdate()
-        // return
+        return
       }
       // node drag
       if (this.dragNode) {
@@ -486,6 +534,12 @@ export default {
           x: Math.round(this.lastMouse.delta.x / this.layout.zoom.current),
           y: Math.round(this.lastMouse.delta.y / this.layout.zoom.current)
         }
+        /*
+        if (this.snapToGrid) {
+          dz.x = Math.round(dz.x / 10) * 10
+          dz.y = Math.round(dz.y / 10) * 10
+        }
+        */
         if (this.selectedNodes.length) {
           this.selectedNodes.forEach(nid => {
             this.nodeDragged(this.graph.nodes[nid], dz)
@@ -530,22 +584,25 @@ export default {
           // selectorRect
           this.contextMenu.show = false
           this.contextMenu.filter = ''
-          if (e.altKey) {
+          // cursor tool or ALT key
+          if (this.tool === 'cursor' || e.altKey) {
             this.dragField = true
             return
           }
-          this.selectedNodes = []
-          if (!this.selectorRect) {
-            this.selectorRect = {
-              fromX: this.lastMouse.paperX,
-              fromY: this.lastMouse.paperY,
-              toX: this.lastMouse.paperX,
-              toY: this.lastMouse.paperY
+          if (this.tool === 'select') {
+            this.selectedNodes = []
+            if (!this.selectorRect) {
+              this.selectorRect = {
+                fromX: this.lastMouse.paperX,
+                fromY: this.lastMouse.paperY,
+                toX: this.lastMouse.paperX,
+                toY: this.lastMouse.paperY
+              }
             }
           }
         }
       }
-      // only middle mouse down
+      // middle mouse down in any mode
       if (e.buttons === 4) {
         // field drag on middle mouse
         if (this.isFieldEvent(e)) {
@@ -572,33 +629,41 @@ export default {
     },
     mouseWheel (e) {
       /**/
-      console.log(e)
+      // console.log(e)
       // this.updateLastMouse(e)
       if (this.layout.zoom.step !== 0.1) this.layout.zoom.step = 0.1
       if (this.layout.zoom.min !== 0.5) this.layout.zoom.min = 0.5
       if (this.layout.zoom.max !== 2.0) this.layout.zoom.max = 2.0
-      const dir = e.deltaY > 0 ? 1 : -1
+
+      const ok = this.zoomAction(e.deltaY > 0 ? 'in' : 'out', false)
+      if (!ok) return
+
+      const paperRect = this.$refs.paper.getBoundingClientRect()
+      const px = e.clientX - paperRect.left
+      const py = e.clientY - paperRect.top
+      if (px < 0 || px > paperRect.width) return
+      if (py < 0 || py > paperRect.height) return
+      const dx = (paperRect.width / 2 - px) / 4
+      const dy = (paperRect.height / 2 - py) / 4
+
+      if (e.deltaY > 0) this.movePaper({ x: -dx, y: -dy })
+      else this.movePaper({ x: dx, y: dy })
+      this.emitUpdate()
+    },
+    zoomAction (action, emitUpdate = true) {
+      const dir = action === 'in' ? 1 : -1
       const step = this.layout.zoom.step * dir
       const next = this.round(this.layout.zoom.current - step, 1)
-      // console.log('next zoom', next)
-      // const lastmp = { x: this.lastMouse.paperX, y: this.lastMouse.paperY }
       if (next >= this.layout.zoom.min && next <= this.layout.zoom.max) {
         this.layout.zoom.current = next
-        this.emitUpdate()
-        /*
-        waitFor(0).then(() => {
-          this.updateLastMouse(e)
-          const nextmp = { x: this.lastMouse.paperX, y: this.lastMouse.paperY }
-          const delta = {
-            x: lastmp.x - nextmp.x,
-            y: lastmp.y - nextmp.y
-          }
-          this.layout.field.top -= delta.y
-          this.layout.field.left -= delta.x
-          // this.layout
-          console.log(delta)
-        })
-        /**/
+        if (emitUpdate) this.emitUpdate()
+        return true
+      }
+      return false
+    },
+    onMouseEdgeEnter (eid) {
+      if (this.tool === 'eraser' && this.lastMouse.buttons === 1) {
+        this.deleteEdge(eid)
       }
     },
     emitUpdate () {
@@ -608,14 +673,14 @@ export default {
       this.$emit('update:modelValue', next)
     },
     typeColor (tp) {
-      // :stroke="types[dragSlot.type].color"
+      const grey = '#999'
       let ftp = null
       Object.keys(this.types).forEach(ttp => {
         if (tp.startsWith(ttp)) {
           ftp = ttp
         }
       })
-      return ftp ? this.types[ftp].color : '#999'
+      return ftp ? this.types[ftp].color : grey
     },
     round (num, digits = 4) {
       if (typeof num !== 'number') return 0
@@ -624,6 +689,37 @@ export default {
     }
   },
   computed: {
+    hasClipboard () {
+      return false
+    },
+    graphTop () {
+      return Object.values(this.layout.parts).reduce((acc, el) => {
+        if (!el.y) return acc
+        if (typeof acc === 'undefined') return el.y
+        return Math.min(acc, el.y)
+      }, undefined)
+    },
+    graphBottom () {
+      return Object.values(this.layout.parts).reduce((acc, el) => {
+        if (!el.y) return acc
+        if (typeof acc === 'undefined') return el.y
+        return Math.max(acc, el.y)
+      }, undefined)
+    },
+    graphLeft () {
+      return Object.values(this.layout.parts).reduce((acc, el) => {
+        if (!el.x) return acc
+        if (typeof acc === 'undefined') return el.x
+        return Math.min(acc, el.x)
+      }, undefined)
+    },
+    graphRight () {
+      return Object.values(this.layout.parts).reduce((acc, el) => {
+        if (!el.x) return acc
+        if (typeof acc === 'undefined') return el.x
+        return Math.max(acc, el.x)
+      }, undefined)
+    },
     nodesList () {
       return Object.values(this.nodes)
     },
@@ -701,9 +797,46 @@ export default {
       X: {{lastMouse.paperX}} Y: {{lastMouse.paperY}}
     </div>
     -->
-    <div class="zoom">
-      Zoom: {{zoom}}
+    <div class="tools-group">
+      <button @click="tool = 'cursor'" class="icon-button" :class="{ active: tool === 'cursor' }" title="Cursor">
+        <i :class="icons.toolArrow + ' ' + icons.fw" />
+      </button>
+      <button @click="tool = 'select'" class="icon-button" :class="{ active: tool === 'select' }" title="Select">
+        <i :class="icons.toolSelectBox + ' ' + icons.fw" />
+      </button>
+      <button @click="tool = 'eraser'" class="icon-button" :class="{ active: tool === 'eraser' }" title="Erase edges">
+        <i :class="icons.toolEraser + ' ' + icons.fw" />
+      </button>
     </div>
+    <!--
+    <div class="tools-group">
+      <button @click="clipboardAction('copy')" class="icon-button" :disabled="!selectedNodes.length" title="Copy to clipboard">
+        <i :class="icons.clipboardCopy + ' ' + icons.fw" />
+      </button>
+      <button @click="clipboardAction('cut')" class="icon-button"  :disabled="!selectedNodes.length" title="Cut to clipboard">
+        <i :class="icons.clipboardCut + ' ' + icons.fw" />
+      </button>
+      <button @click="clipboardAction('paste')" class="icon-button"  :disabled="!hasClipboard" title="Paste from clipboard">
+        <i :class="icons.clipboardPaste + ' ' + icons.fw" />
+      </button>
+    </div>
+    -->
+    <div class="tools-group">
+      <button @click="zoomAction('out')" class="icon-button" :disabled="layout.zoom.current >= layout.zoom.max" title="Zoom in">
+        <i :class="icons.zoomIn + ' ' + icons.fw" />
+      </button>
+      <div class="zoom">{{zoom}}</div>
+      <button @click="zoomAction('in')" class="icon-button" :disabled="layout.zoom.current <= layout.zoom.min" title="Zoom out">
+        <i :class="icons.zoomOut + ' ' + icons.fw" />
+      </button>
+    </div>
+    <!--
+    <div class="tools-group">
+      <button @click="snapToGrid = !snapToGrid" class="icon-button" :class="{ active: snapToGrid }" title="Snap to grid">
+        <i :class="icons.snapToGrid + ' ' + icons.fw" />
+      </button>
+    </div>
+    -->
   </div>
   <div
     ref="paper"
@@ -790,6 +923,8 @@ export default {
           :edge="edge"
           :layout="layout"
           :types="types"
+          :dragSlot="dragSlot"
+          @mouseEnter="onMouseEdgeEnter(edge.id)"
         />
       </svg>
       <GraphNode
@@ -833,12 +968,34 @@ export default {
   position: absolute;
   top: 10px;
   right: 30px;
-
-  border: 1px solid $borderColor;
-  padding: 4px;
-  border-radius: 4px;
   display: flex;
   justify-content: stretch;
+  z-index: 3;
+
+  .tools-group {
+    border: 1px solid $borderColor;
+    padding: 4px;
+    border-radius: 4px;
+    margin-left: 4px;
+    display: flex;
+    z-index: 4;
+
+    .zoom {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding-left: 8px;
+      padding-right: 8px;
+    }
+
+    button.icon-button {
+      z-index: 5;
+
+      &.active {
+        color: #0bf113;
+      }
+    }
+  }
 
   > div {
     padding-right: 10px;

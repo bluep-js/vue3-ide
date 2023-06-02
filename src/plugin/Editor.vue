@@ -16,12 +16,14 @@ import { jclone, waitFor } from './utils.js'
 import { classParents, classCombined, actorCombined } from './graph.js'
 
 const defaultIcons = {
+  // bluep entities
   enum: 'fas fa-list-ol',
   struct: 'fab fa-delicious',
   function: 'fas fa-scroll',
   class: 'fas fa-file-code',
   library: 'fas fa-book',
   event: 'fas fa-bell',
+  // various ui icons
   chevronRight: 'fas fa-chevron-right',
   chevronDown: 'fas fa-chevron-down',
   view: 'far fa-eye',
@@ -31,7 +33,22 @@ const defaultIcons = {
   save: 'fas fa-save',
   run: 'fas fa-play',
   close: 'fas fa-times',
-  fw: 'fa-fw'
+  fw: 'fa-fw',
+  // tools
+  toolArrow: 'fas fa-arrow-pointer',
+  toolEraser: 'fas fa-eraser',
+  toolSelectBox: 'far fa-object-group',
+  toolDeselectBox: 'far fa-object-ungroup',
+  // zoom icons
+  zoom: 'fas fa-magnifying-glass',
+  zoomIn: 'fas fa-magnifying-glass-plus',
+  zoomOut: 'fas fa-magnifying-glass-minus',
+  // snap to grid
+  snapToGrid: 'fas fa-border-none',
+  // clipboard
+  clipboardCopy: 'far fa-copy',
+  clipboardCut: 'far fa-scissors',
+  clipboardPaste: 'far fa-paste'
 }
 
 const defaultFeatures = {
@@ -1520,8 +1537,8 @@ export default {
     />
   </div>
   <div class="main-area">
-    <div v-if="currentLibrary" class="left-bar">
-      <div class="left-bar-scroll">
+    <div v-if="currentLibrary" class="left-bar side-bar">
+      <div class="left-bar-scroll side-bar-scroll">
         <LibraryContentPanel
           :libraries="libs"
           :modules="mods"
@@ -1636,37 +1653,39 @@ export default {
         Viewer
       </div>
     </div>
-    <div v-if="selectedVariable" class="right-bar">
-      <GraphVariablePanel
-        v-if="selectedVariable && selectedElement.type === 'function'"
-        :libraries="libs"
-        :modules="mods"
-        :actors="actors"
-        :currentLibrary="currentLibrary"
-        :variable="selectedVariable.variable"
-        :context="libs[selectedElement.library].functions[selectedElement.code].context"
-        :types="typesFull"
-        :direction="selectedVariable.context"
-        :icons="options.icons"
-        @closeMe="deselectFunctionVariable"
-        @variableUpdated="selectedFunctionVariableChanged"
-        @typeChanged="selectedFunctionVariableTypeChanged"
-      />
-      <GraphVariablePanel
-        v-if="selectedVariable && (selectedElement.type === 'method' || selectedElement.type === 'constructor')"
-        :libraries="libs"
-        :modules="mods"
-        :actors="actors"
-        :currentLibrary="currentLibrary"
-        :variable="selectedVariable.variable"
-        :context="libs[selectedElement.library].classes[selectedElement.class].methods[selectedElement.code].context"
-        :types="typesFull"
-        :direction="selectedVariable.context"
-        :icons="options.icons"
-        @closeMe="deselectClassFunctionVariable"
-        @variableUpdated="selectedClassFunctionVariableChanged"
-        @typeChanged="selectedClassFunctionVariableTypeChanged"
-      />
+    <div v-if="selectedVariable" class="right-bar side-bar">
+      <div class="right-bar-scroll side-bar-scroll">
+        <GraphVariablePanel
+          v-if="selectedVariable && selectedElement.type === 'function'"
+          :libraries="libs"
+          :modules="mods"
+          :actors="actors"
+          :currentLibrary="currentLibrary"
+          :variable="selectedVariable.variable"
+          :context="libs[selectedElement.library].functions[selectedElement.code].context"
+          :types="typesFull"
+          :direction="selectedVariable.context"
+          :icons="options.icons"
+          @closeMe="deselectFunctionVariable"
+          @variableUpdated="selectedFunctionVariableChanged"
+          @typeChanged="selectedFunctionVariableTypeChanged"
+        />
+        <GraphVariablePanel
+          v-if="selectedVariable && (selectedElement.type === 'method' || selectedElement.type === 'constructor')"
+          :libraries="libs"
+          :modules="mods"
+          :actors="actors"
+          :currentLibrary="currentLibrary"
+          :variable="selectedVariable.variable"
+          :context="libs[selectedElement.library].classes[selectedElement.class].methods[selectedElement.code].context"
+          :types="typesFull"
+          :direction="selectedVariable.context"
+          :icons="options.icons"
+          @closeMe="deselectClassFunctionVariable"
+          @variableUpdated="selectedClassFunctionVariableChanged"
+          @typeChanged="selectedClassFunctionVariableTypeChanged"
+        />
+      </div>
     </div>
   </div>
 </div>
@@ -1693,34 +1712,52 @@ export default {
   display: flex;
   height: 100%;
   align-self: stretch;
+  overflow: hidden;
 }
 
-.left-bar {
+.side-bar {
   flex-grow: 1;
   width: $panelWidth;
   max-width: $panelWidth;
-  border-right: $borderColor solid 1px;
-  // overflow: hidden;
-  // max-height: 90%;
+  overflow: hidden;
+  max-height: 100%;
 
-  .left-bar-scroll {
-    // max-height: 100%;
-    // overflow-y: scroll;
+  .side-bar-scroll {
+    max-height: 100%;
+    overflow-y: scroll;
+    overflow-x: hidden;
+    max-height: 100%;
+  }
+  .side-bar-scroll::-webkit-scrollbar {
+    width: 10px;
+  }
+  .side-bar-scroll::-webkit-scrollbar-track {
+    background-color: #222;
+  }
+  .side-bar-scroll::-webkit-scrollbar-thumb {
+    // width: 6px;
+    // background-color: #999;
+    background-image: linear-gradient(180deg, #d0368a 0%, #708ad4 99%);
+  }
+  .side-bar-scroll::-webkit-scrollbar-button,
+  .side-bar-scroll::-webkit-resizer,
+  .side-bar-scroll::-webkit-scrollbar-corner {
+    display: none;
   }
   .panel-50 {
     // max-height: 50%;
   }
 }
 
+.left-bar {
+  border-right: $borderColor solid 1px;
+}
 .paper-area {
   flex-grow: 10;
+  max-height: 100%;
 }
 
 .right-bar {
-  flex-grow: 1;
-  width: $panelWidth;
-  max-width: $panelWidth;
   border-left: $borderColor solid 1px;
-  padding: $panelPadding;
 }
 </style>
