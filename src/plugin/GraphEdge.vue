@@ -1,7 +1,7 @@
 <script>
 export default {
-  props: ['edge', 'types', 'layout'],
-  emits: ['deleteMe'],
+  props: ['edge', 'types', 'layout', 'dragSlot'],
+  emits: ['deleteMe', 'mouseEnter'],
   data () {
     return {
       path: this.getPath()
@@ -31,13 +31,14 @@ export default {
   computed: {
     edgeColor () {
       let ftp = null
+      const grey = '#999'
+      if (this.dragSlot) return grey
       Object.keys(this.types).forEach(ttp => {
         if (this.edge.type.startsWith(ttp)) {
           ftp = ttp
         }
       })
-      return ftp ? this.types[ftp].color : '#999'
-      // return this.types[this.edge.type].color
+      return ftp ? this.types[ftp].color : grey
     }
   },
   watch: {
@@ -57,5 +58,6 @@ export default {
     :stroke="edgeColor"
     :stroke-width="2"
     fill="transparent"
+    @mouseenter="$emit('mouseEnter')"
   />
 </template>

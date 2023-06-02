@@ -22,7 +22,7 @@ export default {
           :isArray="variable.isArray"
           :class="{ 'ml-5': !!withAccess }"
         />
-        <span class="ml-5">{{variable.name}}</span>
+        <span class="ml-5">{{variable.name}}<sup v-if="variable.isArray">{{variable.isArray}}</sup></span>
         <span class="ml-5" v-if="!!withCode">
           [{{variable.code}}]
         </span>
@@ -50,6 +50,10 @@ export default {
 .variable-button {
   flex-grow: 1;
   text-align: left;
+
+  sup {
+    font-size: 60%;
+  }
 }
 
 </style>

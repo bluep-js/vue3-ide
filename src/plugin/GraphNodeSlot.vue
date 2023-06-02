@@ -1,6 +1,12 @@
 <script>
 import ValueWidget from './ValueWidget.vue'
-import { slotTemplateAcceptType, classIsParentOfClass } from './graph.js'
+import {
+  slotTemplateKeys,
+  slotAcceptSlotArray,
+  slotTemplateAcceptSlot,
+  classIsParentOfClass
+} from './graph.js'
+import { jclone } from './utils.js'
 
 export default {
   components: {
@@ -59,10 +65,10 @@ export default {
       } else {
         this.$emit('draggable', {
           slot: {
-            ...this.slot,
+            ...this.computedSlot,
             direction: this.direction
           },
-          type: this.realType,
+          type: this.computedType,
           shift: this.getShift()
         })
       }
@@ -72,10 +78,10 @@ export default {
       if (!this.slotEnabled(false)) return
       this.$emit('dropped', {
         slot: {
-          ...this.slot,
+          ...this.computedSlot,
           direction: this.direction
         },
-        type: this.realType,
+        type: this.computedType,
         shift: this.getShift()
       })
     },
@@ -88,22 +94,19 @@ export default {
 
       if (this.dragSlot.node.id === this.node.id) return false
       if (this.dragSlot.slot.direction === this.direction) return false
-      if (!this.acceptType(this.dragSlot.type)) return false
-      // if (this.dragSlot.type !== this.realType && this.realType !== 'basic/template') return false
-      if (!this.dragSlot.slot.isArray !== !this.slot.isArray) return false
+      if (!this.acceptType(this.dragSlot)) return false
       return true
     },
-    acceptType (tp) {
-      if (tp === this.realType) return true
-      if (this.realType === 'basic/template') {
-        const template = this.node.templates[this.slot.template]
-        return slotTemplateAcceptType(template, tp)
+    acceptType (slot) {
+      if (slot.type === this.computedType) return slotAcceptSlotArray(slot.slot, this.computedSlot)
+      if (this.computedType === 'basic/template') {
+        const cslot = this.computedSlot
+        return slotTemplateAcceptSlot(slot.slot, cslot, this.node.templates[cslot._tkey])
       }
-      if (this.realType.startsWith('bluep/class/') && tp.startsWith('bluep/class/')) {
-        // const clss1 = this.realType.split('/')
-        // const clss2 = tp.split('/')
-        const cls1 = this.realType.slice(12)
-        const cls2 = tp.slice(12)
+      if (!slotAcceptSlotArray(slot.slot, this.computedSlot)) return false
+      if (this.computedType.startsWith('bluep/class/') && slot.startsWith('bluep/class/')) {
+        const cls1 = this.computedType.slice(12)
+        const cls2 = slot.slice(12)
         return this.direction === 'inputs'
           ? classIsParentOfClass(cls1, cls2, this.libraries, this.modules)
           : classIsParentOfClass(cls2, cls1, this.libraries, this.modules)
@@ -112,24 +115,54 @@ export default {
     }
   },
   computed: {
-    realType () {
+    computedType () {
       const type = this.slot.type
-      // template case
-      if (this.slot.type === 'basic/template') {
-        const tpl = this.node.templates[this.slot.template]
-        return tpl.type || type
+      if (this.slot.type !== 'basic/template') return type
+      const tpl = slotTemplateKeys(this.node, this.slot)
+      if (!tpl || !tpl.tkey) return type
+      if (!this.node.templates[tpl.tkey].value) return type
+      return this.node.templates[tpl.tkey].value.type || type
+    },
+    computedSlot () {
+      const src = {
+        isArray: 0,
+        canBeArray: false,
+        ...jclone({ ...this.slot })
       }
-      return type
+      if (src.isArray === true) src.isArray = 1
+      if (this.slot.type !== 'basic/template') return src
+      const tpl = slotTemplateKeys(this.node, this.slot)
+      if (!tpl || !tpl.tkey) return src
+      if (!this.node.templates[tpl.tkey]) return src
+      const template = this.node.templates[tpl.tkey]
+      Object.keys(template.info || {}).forEach(ikey => {
+        src[ikey] = template.info[ikey]
+      })
+      src._tkey = tpl.tkey
+      src._vkey = tpl.vkey
+      Object.keys(template.value || {}).forEach(ikey => {
+        src[ikey] = template.value[ikey]
+      })
+      if (!tpl.vkey || !this.node.templates[tpl.tkey].variants) return src
+      const variant = this.node.templates[tpl.tkey].variants[tpl.vkey]
+      if (!variant) return src
+      Object.keys(variant.info || {}).forEach(ikey => {
+        src[ikey] = variant.info[ikey]
+      })
+      Object.keys(variant.$add || {}).forEach(ikey => {
+        src[ikey] += variant.$add[ikey]
+      })
+      return src
     },
     getColor () {
       const ret = this.slotEnabled() && this.types
-        ? this.types[this.realType]
-          ? this.types[this.realType].color
+        ? this.types[this.computedType]
+          ? this.types[this.computedType].color
           : '#999'
         : '#999'
       /*
       if (ret === '#999') {
-        console.log(this.realType, this.types, this.types[this.realType])
+        console.log(this.computedType, this.types, this.types[this.computedType])
       }
       /**/
       return ret
@@ -137,25 +170,27 @@ export default {
     canManual () {
       // console.log('can manual?', this.slot)
       if (this.direction === 'outputs') return false
-      if (this.slot.manual === false) return false
-      if (this.slot.isArray) return false
-      if (this.slot.type === 'basic/execute') return false
-      if (this.slot.type === 'basic/datetime') return false
-      if (this.slot.type === 'bluep/classselector') return true
-      if (this.slot.type.startsWith('bluep/struct')) return false
-      if (this.slot.type.startsWith('bluep/class')) return false
-      if (this.slot.type.startsWith('bluep/object')) return false
+      if (this.computedSlot.manual === false) return false
+      if (this.computedSlot.isArray) return false
+      if (this.computedSlot.type === 'basic/template') return false
+      if (this.computedSlot.type === 'basic/execute') return false
+      if (this.computedSlot.type === 'basic/datetime') return false
+      if (this.computedSlot.type === 'bluep/classselector') return true
+      if (this.computedSlot.type.startsWith('bluep/struct')) return false
+      if (this.computedSlot.type.startsWith('bluep/class')) return false
+      if (this.computedSlot.type.startsWith('bluep/object')) return false
       if (Object.keys(this.slot.connections || {}).length) return false
       return true
     },
     canConnect () {
-      if (this.slot.type === 'bluep/classselector') return false
+      if (this.computedSlot.type === 'bluep/classselector') return false
       return true
     },
     connectorClass () {
       const list = ['connector']
-      if (this.slot.isArray) list.push('is-array')
-      if (this.slot.type) list.push(`connector-${this.slot.type.replaceAll('/', '-')}`)
+      if (this.computedSlot.isArray) list.push('is-array')
+      if (!this.computedSlot.isArray && this.computedSlot.canBeArray) list.push('can-be-array')
+      if (this.computedSlot.type) list.push(`connector-${this.slot.type.replaceAll('/', '-')}`)
       if (!this.canConnect) list.push('connector-invisible')
       return list.join(' ')
     },
@@ -209,8 +244,8 @@ export default {
   </button>
   <ValueWidget
     v-if="canManual"
-    v-model="slot.value"
-    :info="slot"
+    v-model="computedSlot.value"
+    :info="computedSlot"
     :inSlot="true"
     :types="types"
     :icons="icons"
@@ -220,14 +255,14 @@ export default {
     :currentLibrary="currentLibrary"
     @update:modelValue="updateSlot"
   />
-  <span v-else>{{slot.name}}</span>
+  <span v-else>{{computedSlot.name}}</span>
   <div
     :class="connectorClass"
     ref="connector"
     :style="{
       backgroundColor: getColor
     }"
-    :title="slot.type"
+    :title="computedSlot.type + (computedSlot.isArray ? `[${computedSlot.isArray}]` : computedSlot.canBeArray ? '[?]' : '')"
     @mouseup="mouseUp"
     @mousedown.stop.prevent="mouseDown"
   />
@@ -252,9 +287,17 @@ export default {
   border-radius: 5px;
 
   &.is-array {
-    top: 1px;
+    top: 2px;
     border-radius: 2px;
     transform: rotate(45deg);
+  }
+
+  &.can-be-array {
+    top: 3px;
+    right: -10px !important;
+    border: 0px;
+    transform: rotate(45deg);
+    animation: arrayMutation 12s infinite ease-in-out;
   }
 
   &.connector-invisible {
@@ -304,4 +347,15 @@ export default {
   }
 }
 
+@keyframes arrayMutation {
+  0% {
+    border-radius: 5px;
+  }
+  50% {
+    border-radius: 2px;
+  }
+  100% {
+    border-radius: 5px;
+  }
+}
 </style>

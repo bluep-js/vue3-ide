@@ -165,7 +165,7 @@ export default {
               <i v-if="opens[cls.code]" :class="icons.chevronDown"></i>
               <i v-else :class="icons.chevronRight"></i>
             </button>
-            <button @click="$emit('selectElement', cls)" class="w-100 t-left icon-button button-small">
+            <button @click="$emit('selectElement', cls)" class="w-100 t-left clear-button button-small">
               <i :class="icons.class + ' ' + icons.fw"></i>
               {{cls.name}}
             </button>

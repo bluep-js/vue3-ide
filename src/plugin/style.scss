@@ -118,6 +118,7 @@ input.panel-input {
     // height: $panelTextSize/1.4;
     width: math.div($panelTextSize, 1.4);
     height: math.div($panelTextSize, 1.4);
+    margin: 3px;
   }
 }
 
@@ -243,3 +244,4 @@ select.panel-input {
 .no-wrap {
   white-space: nowrap;
 }
+
