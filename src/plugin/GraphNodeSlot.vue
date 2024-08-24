@@ -41,7 +41,9 @@ export default {
     }
   },
   methods: {
-    updateSlot () {
+    updateSlot (x) {
+      this.slot.value = x
+      // console.log('@updateSlot@', x, this.slot)
       this.$emit('update:modelValue', this.slot)
     },
     getShift () {
@@ -244,7 +246,7 @@ export default {
   </button>
   <ValueWidget
     v-if="canManual"
-    v-model="computedSlot.value"
+    :modelValue="computedSlot.value"
     :info="computedSlot"
     :inSlot="true"
     :types="types"

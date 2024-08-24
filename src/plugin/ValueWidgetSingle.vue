@@ -39,7 +39,7 @@ export default {
     await waitFor(0)
     // if (this.modelValue !== this.val) {
     if (!isEqual(this.modelValue, this.val)) {
-      console.log('VWS::created !==', this.modelValue, this.val)
+      // console.log('VWS::created !==', this.modelValue, this.val)
       this.$emit('update:modelValue', this.val)
     }
   },
@@ -194,9 +194,9 @@ export default {
     modelValue: {
       handler (next) {
         // if (this.val !== next) {
-        console.log('VWS::watcher', next)
+        // console.log('VWS::watcher', next)
         if (!isEqual(next, this.val)) {
-          console.log('VWS::watcher++', next)
+          // console.log('VWS::watcher++', next)
           this.val = next
         }
       },
